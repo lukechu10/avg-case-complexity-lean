@@ -30,6 +30,17 @@ noncomputable def wrongProb (L : Language) (x : Word) (p : PMF Answer) : ENNReal
 noncomputable def failureProb (L : Language) (x : Word) (p : PMF Answer) : ENNReal :=
   eventProb p (fun a => a ≠ some (L x))
 
+/-- For a Boolean decision problem there is exactly one wrong Boolean answer. -/
+theorem wrongProb_eq_mass (L : Language) (x : Word) (p : PMF Answer) :
+    wrongProb L x p = p (some (!L x)) := by
+  cases h : L x <;> simp [wrongProb, IsAllowed, eventProb, Fintype.sum_option, h]
+
+/-- Total failure is the sum of giving-up and wrong-Boolean-answer probabilities. -/
+theorem failureProb_eq_add (L : Language) (x : Word) (p : PMF Answer) :
+    failureProb L x p = p none + wrongProb L x p := by
+  cases h : L x <;> simp [failureProb, wrongProb, IsAllowed, eventProb,
+    Fintype.sum_option, h]
+
 /-- Pointwise correctness is required only on the ensemble support. -/
 def DeterministicScheme.Correct (A : DeterministicScheme)
     (P : DistributionalProblem) : Prop :=

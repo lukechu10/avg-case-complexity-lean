@@ -6,3 +6,4 @@ import AverageCaseComplexity.Distributions
 import AverageCaseComplexity.Schemes
 import AverageCaseComplexity.Sampling
 import AverageCaseComplexity.Classes
+import AverageCaseComplexity.Amplification

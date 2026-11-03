@@ -25,12 +25,14 @@ complexity of AvgBPP*. See:
 
 `AverageCaseComplexity.Classes` defines machine-certified `AvgP`, `AvgBPP`,
 `HeurP`, and `HeurBPP`, using unary reciprocal accuracy parameters.
-This is a partial formalization; amplification and oracle reductions are
-not yet implemented.
+Fixed-threshold amplification and the inclusion `AvgBPP ⊆ HeurBPP` are
+implemented. This remains a partial formalization: exponentially-small-error
+amplification and oracle reductions are not yet implemented.
 
 Additional checks:
 
 ```sh
 lake env lean Tests/Accuracy.lean
 lake env lean Tests/Classes.lean
+lake env lean Tests/Amplification.lean
 ```

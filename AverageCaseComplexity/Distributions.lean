@@ -57,6 +57,18 @@ theorem Ensemble.prob_eq_zero_of_not_support (D : Ensemble) (n : ℕ)
   · simp [hw]
   · simp [h w.toWord ⟨n, w, rfl, hw⟩]
 
+/-- Event inclusion on the support suffices for comparing input probabilities. -/
+theorem Ensemble.prob_mono_on_support (D : Ensemble) (n : ℕ)
+    {E F : Word → Prop} (h : ∀ x, D.Supports x → E x → F x) :
+    D.prob n E ≤ D.prob n F := by
+  classical
+  apply Finset.sum_le_sum
+  intro w _
+  by_cases hw : D n w = 0
+  · simp [hw]
+  · have himp := h w.toWord ⟨n, w, rfl, hw⟩
+    split_ifs <;> simp_all
+
 /-- A language supplied with an input distribution ensemble. -/
 structure DistributionalProblem where
   language : Language
