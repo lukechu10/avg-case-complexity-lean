@@ -1,0 +1,10 @@
+{
+  "mcpServers": {
+    "lean": {
+      "command": "uvx",
+      "args": [
+        "lean-lsp-mcp"
+      ]
+    }
+  }
+}

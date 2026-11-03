@@ -1,0 +1,22 @@
+name = "average_case_complexity"
+version = "0.1.0"
+keywords = ["math"]
+defaultTargets = ["AverageCaseComplexity"]
+
+[leanOptions]
+pp.unicode.fun = true # pretty-prints `fun a ↦ b`
+
+[[require]]
+name = "mathlib"
+scope = "leanprover-community"
+rev = "v4.35.0"
+
+# Last revision before Complexitylib moved to Lean 4.36.
+# The package was still named complexitylib2; imports use Complexity.
+[[require]]
+name = "complexitylib2"
+git = "https://github.com/cslib-community/complexitylib"
+rev = "9a34274a0fa6c857c9d6ae2f3dea148048c8b876"
+
+[[lean_lib]]
+name = "AverageCaseComplexity"
