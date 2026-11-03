@@ -11,6 +11,7 @@ All definitions live in namespace `AverageCaseComplexity`.
 | `Distributions` | `Ensemble`, finite `eventProb`, ensemble event probabilities and support, `DistributionalProblem`, `uniformEnsemble` |
 | `Schemes` | Deterministic/randomized semantic schemes; correctness, usefulness, and heuristic conditions; a probability-level deterministic inclusion theorem |
 | `Sampling` | Unary input embedding, word-valued ensemble semantics, machine-certified exact `PSamp` |
+| `Classes` | Machine-certified deterministic/randomized schemes; `AvgP`, `AvgBPP`, `HeurP`, `HeurBPP`; class inclusions and `WithPSamp` |
 
 We explicitly extend the paper's positive-length ensembles to length zero.
 `Accuracy` is now a positive natural number `k`, requesting error less than
@@ -55,11 +56,31 @@ user-specified costs rather than verifying execution time.
 
 `Schemes` separates probability properties from executable implementations.
 An arbitrary `Word → Accuracy → PMF Answer` is **not** an efficient scheme.
-The four complexity classes `AvgP`, `AvgBPP`, `HeurP`, and `HeurBPP` are
-therefore not defined yet.
+`Classes` now combines those semantic conditions with machine certificates:
 
-The accuracy encoding is now fixed. Next, attach executable programs and
-machine certificates using `schemeInputEncoding`. At positive input lengths
+- `PolyTimeDeterministicScheme` certifies the curried `run` function via
+  `ComputableTidilyInPolyTime` on `(x,k)`.
+- `PolyTimeRandomizedScheme` certifies a `ProbComp Answer` program via
+  `IsPPTOn`. Its `run` is the PMF semantics of that program.
+- Both use `schemeInputEncoding` and a fixed two-bit answer encoding:
+  `00` for giving up, `10` for false, `11` for true. These are explicit
+  implementation choices, not the output convention used later in Section 3.
+- `AvgP`, `AvgBPP`, `HeurP`, and `HeurBPP` existentially quantify over
+  these certified schemes and impose the corresponding semantic conditions.
+- `WithPSamp C P` is the restriction `C P ∧ PSamp P.distribution`.
+
+Proved inclusions: `AvgP.toHeurP`, `AvgP.toAvgBPP`, and `HeurP.toHeurBPP`.
+`WithPSamp.mono` transfers any inclusion to samplable ensembles.
+`AvgP.constant` constructs a machine-certified solver for either constant
+language under any ensemble. The randomized inclusion `AvgBPP ⊆ HeurBPP`
+is still pending: simply filling in giving-up answers is not sufficient
+without adjusting the error bounds using amplification.
+
+General heuristic schemes currently share the three-answer output type;
+giving up counts as failure. Removing give-up outputs without worsening
+failure probabilities is a future normalization lemma.
+
+At positive input lengths
 `n`, the encoded size `n + k + 1` is at most `3*n*k`, while `n*k` is at most
 the square of the encoded size. Thus polynomial bounds match the paper's
 `poly(n/δ)` at `δ = 1/k`. Length zero is handled by the encoded size's `+1`.
@@ -74,3 +95,16 @@ Also still pending: Levin's moment condition, fixed-budget/time-bounded
 classes, oracle reductions and domination, amplification, and the Section 2
 reduction theorems. The mathematical specification is in
 `section2-definitions.md`.
+
+## Validation
+
+```sh
+lake build
+lake env lean Tests/Accuracy.lean
+lake env lean Tests/Classes.lean
+```
+
+The tests include constant languages, machine-certified deterministic to
+randomized inclusions, preservation of the `PSamp` restriction, and rejection
+of an always-give-up scheme. They also distinguish wrong-answer probability
+from total failure probability.

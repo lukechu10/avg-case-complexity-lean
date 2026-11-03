@@ -105,4 +105,33 @@ theorem DeterministicScheme.ErrorlessConditions.toHeuristic
   rw [heq]
   exact h.useful δ n
 
+/-- The give-up threshold for a deterministic output is exactly giving up. -/
+@[simp] theorem pure_giveUp_threshold (a : Answer) :
+    (1 / 4 : ENNReal) ≤ (PMF.pure a) none ↔ a = none := by
+  cases a <;> norm_num [PMF.pure_apply]
+
+/-- The failure threshold for a deterministic output is exactly failure. -/
+@[simp] theorem pure_failure_threshold (L : Language) (x : Word) (a : Answer) :
+    (1 / 4 : ENNReal) ≤ failureProb L x (PMF.pure a) ↔ a ≠ some (L x) := by
+  classical
+  by_cases h : a = some (L x) <;> simp [failureProb, h]
+
+/-- Deterministic errorless semantic guarantees lift to randomized guarantees. -/
+theorem DeterministicScheme.ErrorlessConditions.randomize
+    {A : DeterministicScheme} {P : DistributionalProblem}
+    (h : A.ErrorlessConditions P) : A.randomize.ErrorlessConditions P := by
+  constructor
+  · intro k x hx
+    have ha := h.correct k x hx
+    simp [DeterministicScheme.randomize, wrongProb, ha]
+  · intro k n
+    simpa only [DeterministicScheme.randomize, pure_giveUp_threshold] using h.useful k n
+
+/-- Deterministic heuristic semantic guarantees lift to randomized guarantees. -/
+theorem DeterministicScheme.HeuristicConditions.randomize
+    {A : DeterministicScheme} {P : DistributionalProblem}
+    (h : A.HeuristicConditions P) : A.randomize.HeuristicConditions P := by
+  intro k n
+  simpa only [DeterministicScheme.randomize, pure_failure_threshold] using h k n
+
 end AverageCaseComplexity

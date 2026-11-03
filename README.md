@@ -14,3 +14,23 @@ lake update complexitylib2
 lake exe cache get
 lake build
 ```
+
+## Formalization
+
+The current development starts with Section 2 of Itsykson's *Structural
+complexity of AvgBPP*. See:
+
+- [Mathematical definitions](docs/section2-definitions.md)
+- [Lean modules, computational model, and current scope](docs/lean-foundations.md)
+
+`AverageCaseComplexity.Classes` defines machine-certified `AvgP`, `AvgBPP`,
+`HeurP`, and `HeurBPP`, using unary reciprocal accuracy parameters.
+This is a partial formalization; amplification and oracle reductions are
+not yet implemented.
+
+Additional checks:
+
+```sh
+lake env lean Tests/Accuracy.lean
+lake env lean Tests/Classes.lean
+```

@@ -5,3 +5,4 @@ import AverageCaseComplexity.Accuracy
 import AverageCaseComplexity.Distributions
 import AverageCaseComplexity.Schemes
 import AverageCaseComplexity.Sampling
+import AverageCaseComplexity.Classes

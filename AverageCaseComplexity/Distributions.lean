@@ -25,6 +25,18 @@ noncomputable def eventProb {α : Type*} [Fintype α] (p : PMF α)
     eventProb p (fun _ => True) = 1 := by
   simpa [eventProb, tsum_fintype] using p.tsum_coe
 
+open scoped Classical in
+/-- A deterministic output has event probability zero or one. -/
+@[simp] theorem eventProb_pure {α : Type*} [Fintype α] (a : α) (event : α → Prop) :
+    eventProb (PMF.pure a) event = if event a then 1 else 0 := by
+  classical
+  unfold eventProb
+  rw [Finset.sum_eq_single a]
+  · simp [PMF.pure_apply]
+  · intro b _ hba
+    simp [PMF.pure_apply, hba]
+  · simp
+
 /-- Event probability at a specified input length. -/
 noncomputable def Ensemble.prob (D : Ensemble) (n : ℕ)
     (event : Word → Prop) : ENNReal :=
