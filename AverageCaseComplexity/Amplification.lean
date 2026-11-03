@@ -2,16 +2,21 @@ module
 
 public import AverageCaseComplexity.Amplification.Bounds
 public import AverageCaseComplexity.Amplification.Runtime
+public import AverageCaseComplexity.Amplification.Exponential
 
 @[expose] public section
 
 /-!
-# Fixed-threshold amplification for randomized errorless heuristic schemes
+# Amplification for randomized errorless heuristic schemes
 
 Independent three-run plurality boosting achieves any fixed positive internal
-error threshold. The input exceptional-set bound `1/k` is unchanged, and strict
-polynomial time is preserved. This is a fixed-threshold version of Itsykson's
-Lemma 2.1, not yet its exponentially-small-error, polynomial-repetition version.
+error threshold. The imported `Exponential` module proves efficient exponential
+amplification using flat repetition and Hoeffding's inequality. Both constructions
+preserve the input exceptional-set bound `1/k` and strict polynomial time.
+
+The printed Lemma 2.1's unrestricted upper interval needs a caveat; see
+`ThresholdCaveat`. The downward-amplification direction and an exponential-error
+characterization of `AvgBPP` are proved without that claim.
 -/
 
 namespace AverageCaseComplexity

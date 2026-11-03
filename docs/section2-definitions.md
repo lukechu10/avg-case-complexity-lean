@@ -268,8 +268,15 @@ the class definitions:
   \le 2e^{-2\epsilon^2N}.
   \]
 - Lemma 2.1: amplification of the `1/4` thresholds in Definition 2.1,
-  down to exponentially small error. The paper's asymptotic interval
-  `(2^{-Ω(n)},1/2)` needs a precise quantified statement in Lean.
+  down to exponentially small error. **Caveat:** interpreting the statement
+  that both thresholds can be replaced by any common constant below `1/2`
+  as an equivalence of the resulting classes is false for the displayed conditions. At threshold `2/5`, an input-independent
+  law with `P(0)=P(1)=3/8`, `P(⊥)=1/4` satisfies both conditions for every
+  language. This semantic counterexample is checked in
+  `Amplification/ThresholdCaveat.lean`. The valid direction being formalized
+  is amplification from `1/4` down to exponentially small thresholds.
+  This counterexample does not contradict the one-way reading that an
+  existing `AvgBPP` scheme can achieve any such target.
 - `AvgP ⊆ HeurP` and `AvgBPP ⊆ HeurBPP`.
 - Lemma 2.2: errorless reductions preserve `AvgP`; heuristic reductions
   preserve `HeurP`.

@@ -12,7 +12,8 @@ All definitions live in namespace `AverageCaseComplexity`.
 | `Schemes` | Deterministic/randomized semantic schemes; correctness, usefulness, and heuristic conditions; a probability-level deterministic inclusion theorem |
 | `Sampling` | Unary input embedding, word-valued ensemble semantics, machine-certified exact `PSamp` |
 | `Classes` | Machine-certified deterministic/randomized schemes; `AvgP`, `AvgBPP`, `HeurP`, `HeurBPP`; class inclusions and `WithPSamp` |
-| `Amplification` | Independent three-run plurality, rare-answer contraction, any fixed positive error threshold, runtime preservation, and `AvgBPP.toHeurBPP` |
+| `Amplification` | Constant-error amplification, general threshold conversions, and `AvgBPP.toHeurBPP` |
+| `Amplification.Exponential` | Flat plurality, Hoeffding tail, certified polynomial-time exponential-error amplification, and an equivalent characterization of `AvgBPP` |
 
 We explicitly extend the paper's positive-length ensembles to length zero.
 `Accuracy` is now a positive natural number `k`, requesting error less than
@@ -92,9 +93,7 @@ arbitrarily verbose rational encodings. We have not yet proved a full
 equivalence between machine models with different accuracy encodings.
 
 Also still pending: Levin's moment condition, fixed-budget/time-bounded
-classes, oracle reductions and domination, exponentially-small-error amplification,
-and the Section 2
-reduction theorems. The mathematical specification is in
+classes, oracle reductions and domination, and the Section 2 reduction theorems. The mathematical specification is in
 `section2-definitions.md`.
 
 ## Amplification results
@@ -128,11 +127,66 @@ The explicit eight-level bound `amplifyPMF_eight_lt_ennreal` remains only as
 an optional numerical example in `Amplification.Bounds` (and its tests).
 There is no separate eighth-error scheme definition or amplification proof.
 
-This is a fixed-threshold version of Lemma 2.1, **not** the full efficient
-exponentially-small-error statement. Choosing depth proportional to input
-length here uses exponentially many base calls. The full result needs a
-flat polynomial-size plurality vote and concentration bounds, or another
-more efficient construction.
+### Efficient exponential-error amplification
+
+`Amplification.Flat.Basic` defines flat plurality over all independent runs.
+Its deterministic winner appears at least `N/3` times. For an answer of
+probability at most `1/4`, this exceeds its mean by at least `N/12`.
+`Amplification.Flat.Bounds.flatPMF_rare_le` applies the dependency's finite-PMF
+Hoeffding theorem to obtain
+
+\[
+\Pr[\text{plurality returns }a] \le \exp(-N/72),\qquad N>0.
+\]
+
+`Amplification.Flat.Runtime` certifies repetition and the actual vote-counting
+algorithm. Counts are computed by filtering and taking length; unary count
+comparisons and branch selection are certified deterministic operations.
+This is not a constant-time assumption about an arbitrary list function.
+
+For fixed natural `rate = r`, choose
+
+\[
+N=72(r+1)(L+1),\qquad L=|x|+k+1.
+\]
+
+This is linear in the complete encoded input length, not exponential.
+The machine also computes the repetition count in polynomial time.
+`Amplification.ErrorBounds.exponentialError r n` denotes `exp(-r(n+1))`.
+The shift handles length zero explicitly.
+
+- `amplification_exponential`: the certified scheme `A.flatAmplifyLinear r`
+  has wrong-answer probability strictly below `exp(-r(n+1))` on supported
+  inputs. The input mass on which give-up probability is at least that
+  threshold remains strictly below `1/k`.
+- `amplification_for_thresholds`: every length-dependent target bounded below
+  by one of these exponentials is achievable, without needing to compute
+  the target function at runtime.
+- `avgBPP_iff_exponential`: for each `r ≥ 2`, existence of such an
+  exponential-error certified scheme is equivalent to `AvgBPP` membership.
+  The reverse direction uses `exp(-r(n+1)) < 1/4` at all lengths.
+
+Thus efficient downward amplification from the paper's `1/4` conditions to
+exponentially small internal error is implemented. Recursive three-run voting
+remains available for constant thresholds, but is not used for this theorem.
+
+### Caveat about the printed upper interval
+
+Interpreting Lemma 2.1's upper interval as an unrestricted equivalence of
+complexity classes is problematic. For threshold `2/5`, the fixed distribution
+
+\[
+\Pr[0]=\Pr[1]=3/8,\qquad \Pr[\bot]=1/4
+\]
+
+has wrong-answer probability below `2/5` for either true label and give-up
+probability below `2/5`. Therefore it meets the two semantic conditions for
+**every** language. It can be sampled with three fair bits; the current
+`ThresholdCaveat.looseThreshold_conditions` formally checks the probability
+conditions but does not add a machine certificate for that sampler.
+We do not assert an unrestricted threshold-equivalence claim. This caveat
+does not contradict one-way amplification from an existing quarter-error
+scheme. A formal complexity-class separation is not claimed by the code.
 
 ## Validation
 
@@ -141,6 +195,7 @@ lake build
 lake env lean Tests/Accuracy.lean
 lake env lean Tests/Classes.lean
 lake env lean Tests/Amplification.lean
+lake env lean Tests/ExponentialAmplification.lean
 ```
 
 The tests include constant languages, machine-certified deterministic to

@@ -25,9 +25,11 @@ complexity of AvgBPP*. See:
 
 `AverageCaseComplexity.Classes` defines machine-certified `AvgP`, `AvgBPP`,
 `HeurP`, and `HeurBPP`, using unary reciprocal accuracy parameters.
-Fixed-threshold amplification and the inclusion `AvgBPP ⊆ HeurBPP` are
-implemented. This remains a partial formalization: exponentially-small-error
-amplification and oracle reductions are not yet implemented.
+Constant-threshold and efficient exponential-error amplification, as well as
+`AvgBPP ⊆ HeurBPP`, are implemented. The documented downward-amplification
+result records a caveat about interpreting the paper's upper-threshold
+interval as an unrestricted class equivalence. This remains a partial formalization; oracle reductions are not yet
+implemented.
 
 Additional checks:
 
@@ -35,4 +37,5 @@ Additional checks:
 lake env lean Tests/Accuracy.lean
 lake env lean Tests/Classes.lean
 lake env lean Tests/Amplification.lean
+lake env lean Tests/ExponentialAmplification.lean
 ```

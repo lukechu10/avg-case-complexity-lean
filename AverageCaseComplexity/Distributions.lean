@@ -69,6 +69,18 @@ theorem Ensemble.prob_mono_on_support (D : Ensemble) (n : ℕ)
   · have himp := h w.toWord ⟨n, w, rfl, hw⟩
     split_ifs <;> simp_all
 
+/-- Event inclusion may use both the input's support and its fixed length. -/
+theorem Ensemble.prob_mono_on_length (D : Ensemble) (n : ℕ)
+    {E F : Word → Prop} (h : ∀ x, x.length = n → D.Supports x → E x → F x) :
+    D.prob n E ≤ D.prob n F := by
+  classical
+  apply Finset.sum_le_sum
+  intro w _
+  by_cases hw : D n w = 0
+  · simp [hw]
+  · have himp := h w.toWord (by simp) ⟨n, w, rfl, hw⟩
+    split_ifs <;> simp_all
+
 /-- A language supplied with an input distribution ensemble. -/
 structure DistributionalProblem where
   language : Language
