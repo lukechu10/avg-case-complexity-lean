@@ -18,6 +18,8 @@ All definitions live in namespace `AverageCaseComplexity`.
 | `Reductions.OracleMachine` | Deterministic finite-control oracle-machine execution, exact query traces, library-program agreement, and clock-derived query bounds |
 | `Reductions.OracleScheme` | Uniform polynomial halting certificates, valid encoded answers, typed oracle programs, and queried-at-least-once indicators |
 | `Reductions.Definitions` | Errorless and heuristic distributional Turing reductions, exceptional sets, and domination (Definition 2.2) |
+| `Reductions.SimulationRuntime` | Deterministic machine-certified partial-oracle substitution with abort propagation |
+| `Reductions.Closure` | Unconditional `HeurP` closure; `AvgP` closure with explicit support-preserving queries or globally correct target solver |
 
 We explicitly extend the paper's positive-length ensembles to length zero.
 `Accuracy` is now a positive natural number `k`, requesting error less than
@@ -100,9 +102,12 @@ arbitrarily verbose rational encodings. We have not yet proved a full
 equivalence between machine models with different accuracy encodings.
 
 Also still pending: Levin's moment condition, fixed-budget/time-bounded
-classes, and the Section 2 reduction closure theorems. Oracle execution and
-Definition 2.2 (including domination) are now implemented, but Lemma 2.2 has
-not been started, pending user verification of the definitions. The mathematical specification is in
+classes, and randomized reduction closure results. Oracle execution and
+Definition 2.2 (including domination) are implemented. Lemma 2.2(2), heuristic
+closure, is proved with genuine deterministic machine certificates. Errorless
+closure requires an explicit additional support condition or a supplied globally
+correct target solver; the paper's pointwise-correctness gap is explained in
+[section2-closure.md](section2-closure.md). The mathematical specification is in
 `section2-definitions.md`.
 
 ## Amplification results
@@ -206,6 +211,7 @@ lake env lean Tests/Classes.lean
 lake env lean Tests/Amplification.lean
 lake env lean Tests/ExponentialAmplification.lean
 lake env lean Tests/Reductions.lean
+lake env lean Tests/ReductionClosure.lean
 ```
 
 The tests include constant languages, machine-certified deterministic to

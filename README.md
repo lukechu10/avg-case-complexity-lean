@@ -29,7 +29,10 @@ Constant-threshold and efficient exponential-error amplification, as well as
 `AvgBPP ⊆ HeurBPP`, are implemented. The documented downward-amplification
 result records a caveat about interpreting the paper's upper-threshold
 interval as an unrestricted class equivalence. Deterministic oracle execution and the distributional Turing-reduction
-definitions are implemented; their closure theorems are not yet proved.
+definitions are implemented. Heuristic reductions preserve `HeurP`; errorless
+closure is proved with an explicit support-preservation hypothesis or a globally
+correct target solver. See [the closure notes](docs/section2-closure.md) for the
+support issue in the paper's stated errorless argument.
 
 Additional checks:
 
@@ -39,4 +42,5 @@ lake env lean Tests/Classes.lean
 lake env lean Tests/Amplification.lean
 lake env lean Tests/ExponentialAmplification.lean
 lake env lean Tests/Reductions.lean
+lake env lean Tests/ReductionClosure.lean
 ```

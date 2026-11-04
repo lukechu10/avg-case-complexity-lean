@@ -245,7 +245,11 @@ strict (`< δ`).
 
 In particular, outside the exceptional set, a positive-mass source input
 cannot query a target string of zero `D'`-mass. This support property will
-matter when invoking the target scheme's correctness guarantee.
+matter when invoking the target scheme's correctness guarantee. It does not
+ensure support preservation on `E`, although errorless source correctness is
+pointwise there too. The resulting gap in the paper's proposed errorless
+simulation argument, and the explicitly repaired closure theorems, are documented
+in [section2-closure.md](section2-closure.md).
 
 ### Heuristic reduction
 
@@ -278,8 +282,11 @@ the class definitions:
   This counterexample does not contradict the one-way reading that an
   existing `AvgBPP` scheme can achieve any such target.
 - `AvgP ⊆ HeurP` and `AvgBPP ⊆ HeurBPP`.
-- Lemma 2.2: errorless reductions preserve `AvgP`; heuristic reductions
-  preserve `HeurP`.
+- Lemma 2.2: the paper states that errorless reductions preserve `AvgP` and
+  heuristic reductions preserve `HeurP`. Heuristic closure is implemented.
+  Errorless closure is implemented with explicit support-preserving queries or
+  a supplied globally correct target solver; the unrestricted stated argument
+  does not establish pointwise correctness on the domination exceptional set.
 - Corollary 2.1: sufficiently long queries allow transferring fixed-budget
   `Avg_{1/n^c} P` / `Heur_{1/n^c} P` membership to adjustable-parameter
   `AvgP` / `HeurP` membership.

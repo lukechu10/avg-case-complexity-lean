@@ -1,7 +1,8 @@
 # Deterministic distributional Turing reductions
 
-Scope: tasks 1–3 (oracle APIs, execution/query events, and Definition 2.2).
-**Lemma 2.2 closure results are intentionally not part of this implementation.**
+This document describes oracle APIs, execution/query events, and Definition 2.2.
+The subsequent closure results and the support issue in the errorless case are
+documented in [section2-closure.md](section2-closure.md).
 
 ## Source specification
 
@@ -149,11 +150,13 @@ existing scheme probability conditions and add domination.
 `ErrorlesslyReducible` and `HeuristicallyReducible` existentially quantify over
 certified `PolyTimeOracleScheme` witnesses.
 
-## Verification boundary
+## Closure status
 
-These are execution foundations and definitions, not closure theorems.
-No solver substitution, AvgP/HeurP downward closure, or Lemma 2.2 proof is
-included. Those should begin only after the user verifies this model.
+Following verification of these definitions, machine-certified solver substitution
+and unconditional `HeurP` downward closure were added. Errorless `AvgP` closure
+is proved with explicit support-preserving queries, or with a supplied globally
+correct target solver. An unconditional errorless closure theorem is not claimed;
+see [section2-closure.md](section2-closure.md) for the pointwise support issue.
 
 ## Validation
 

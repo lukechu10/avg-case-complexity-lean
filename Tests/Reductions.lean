@@ -107,7 +107,19 @@ example (D : Ensemble) (n : ℕ) (k : Accuracy) :
   simpa only [PolyTimeOracleScheme.queryMass, Set.mem_empty_iff_false, not_false_eq_true,
     hasks, and_self] using eventProb_true (D n)
 
--- A small witness sanity check, not the Lemma 2.2 closure theorem.
+-- Actual adaptive executions through the new aborting simulator.
+example : adaptiveScheme.simulate (fun _ _ => some false) ([], ⟨1, by decide⟩) =
+    some false := rfl
+example : adaptiveScheme.simulate (fun _ _ => some true) ([], ⟨1, by decide⟩) =
+    some true := rfl
+example : adaptiveScheme.simulate (fun _ _ => none) ([], ⟨1, by decide⟩) = none := rfl
+
+-- The simulator has a genuine deterministic machine certificate, not just output semantics.
+example : Turing.MultiTapeTM.ComputableTidilyInPolyTime
+    (adaptiveScheme.simulate (fun _ _ => some false)) schemeInputEncoding answerEncoding :=
+  adaptiveScheme.simulate_efficient (answer := fun _ _ => some false) (.const (some false))
+
+-- A small reduction-witness sanity check.
 example (bit : Bool) (D : Ensemble) (target : DistributionalProblem) :
     ErrorlesslyReducible ⟨fun _ => bit, D⟩ target := by
   refine ⟨constantScheme bit, ⟨?_, ?_⟩⟩
