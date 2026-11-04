@@ -119,6 +119,25 @@ example : Turing.MultiTapeTM.ComputableTidilyInPolyTime
     (adaptiveScheme.simulate (fun _ _ => some false)) schemeInputEncoding answerEncoding :=
   adaptiveScheme.simulate_efficient (answer := fun _ _ => some false) (.const (some false))
 
+-- A source-dependent exponential envelope stays linear in the quantitative
+-- certificate for this actual adaptive finite transition table.
+example : ∃ d, Turing.MultiTapeTM.ComputableTidilyInO
+    (adaptiveScheme.simulate (fun _ _ => some false)) schemeInputEncoding answerEncoding
+    (fun a => ((schemeInputEncoding a).length + 1) ^ d * (2 ^ (a.1.length ^ 2) + 1))
+    (fun a => ((schemeInputEncoding a).length + 1) ^ d * (2 ^ (a.1.length ^ 2) + 1)) := by
+  have hc : Turing.MultiTapeTM.ComputableTidilyInO
+      (fun _ : (Word × Accuracy) × Word => (some false : Answer))
+      (Turing.MultiTapeTM.encPair schemeInputEncoding Turing.MultiTapeTM.encBits) answerEncoding
+      (fun p => ((Turing.MultiTapeTM.encPair schemeInputEncoding Turing.MultiTapeTM.encBits p).length + 1) ^ 1 +
+        2 ^ (p.1.1.length ^ 2))
+      (fun p => ((Turing.MultiTapeTM.encPair schemeInputEncoding Turing.MultiTapeTM.encBits p).length + 1) ^ 1 +
+        2 ^ (p.1.1.length ^ 2)) :=
+    (Turing.MultiTapeTM.ComputableTidilyInO.const (some false)).mono_le
+      (fun p => by simp only [pow_one]; exact (Nat.le_succ _).trans (Nat.le_add_right _ _))
+      (fun p => by simp only [pow_one]; exact (Nat.le_succ _).trans (Nat.le_add_right _ _))
+  exact adaptiveScheme.simulate_arbitrary_inO (answer := fun _ _ => some false)
+    (H := fun a => 2 ^ (a.1.length ^ 2)) hc
+
 -- A small reduction-witness sanity check.
 example (bit : Bool) (D : Ensemble) (target : DistributionalProblem) :
     ErrorlesslyReducible ⟨fun _ => bit, D⟩ target := by

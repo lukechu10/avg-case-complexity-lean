@@ -5,8 +5,9 @@ Annals of Pure and Applied Logic 162 (2010), Section 2, printed pp. 214–217
 (PDF pp. 2–5). The central formulas in §§2.3–2.5 were checked against
 rendered images of printed pp. 215–216.
 
-This is a mathematical specification, not yet a Lean implementation.
-Explicit conventions and points requiring a modeling decision are collected below.
+This is a mathematical specification, not a coverage inventory. Implementation
+status is recorded in `lean-foundations.md`, `section2-closure.md`, and
+`section2-corollaries.md`. Explicit conventions and modeling decisions follow.
 
 ## 1. Basic notation (§2.1)
 
@@ -289,9 +290,16 @@ the class definitions:
   does not establish pointwise correctness on the domination exceptional set.
 - Corollary 2.1: sufficiently long queries allow transferring fixed-budget
   `Avg_{1/n^c} P` / `Heur_{1/n^c} P` membership to adjustable-parameter
-  `AvgP` / `HeurP` membership.
+  `AvgP` / `HeurP` membership. Implemented for arbitrary length-dependent budgets,
+  including real-exponent inverse powers, using a finite cover of query lengths.
+  Fixed-budget errorlessness is global as stated in §2.4, so this does not depend
+  on the deferred unrestricted errorless closure statement.
 - Corollary 2.2: a quantitative runtime transfer for errorless reductions,
-  using a bound on query lengths outside the exceptional set.
+  using a bound on query lengths outside the exceptional set. The cutoff and
+  semantic transfer are implemented; the exact printed runtime formula requires
+  care because the target accuracy is `ε`, not the outer `δ`. See the corollary
+  notes for the completed machine-certified target-cost envelope theorem and
+  the paper-shaped specialization with an explicitly enlarged polynomial argument.
 
 ## 7. Modeling decisions before writing Lean definitions
 

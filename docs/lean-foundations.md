@@ -20,6 +20,12 @@ All definitions live in namespace `AverageCaseComplexity`.
 | `Reductions.Definitions` | Errorless and heuristic distributional Turing reductions, exceptional sets, and domination (Definition 2.2) |
 | `Reductions.SimulationRuntime` | Deterministic machine-certified partial-oracle substitution with abort propagation |
 | `Reductions.Closure` | Unconditional `HeurP` closure; `AvgP` closure with explicit support-preserving queries or globally correct target solver |
+| `FixedBudget` | Machine-certified fixed algorithms, global errorlessness, arbitrary length-dependent error budgets, and real-exponent inverse-power budgets |
+| `TimeClasses` | Actual arbitrary-time certificates for deterministic schemes and fixed algorithms; deterministic `AvgEXP` |
+| `Reductions.FixedBudget` | Corollary 2.1, using a finite cover of distinct query lengths |
+| `Reductions.Cutoff` | Cutoff-aware distributional transfer with one shared domination exceptional set |
+| `Reductions.SimulationArbitrary` | Full arbitrary-time oracle substitution with linear target-cost dependence |
+| `Reductions.Corollaries` | Corollary 2.2 with explicit target-cost envelope, support qualification, and monotone-time enlarged-argument specialization |
 
 We explicitly extend the paper's positive-length ensembles to length zero.
 `Accuracy` is now a positive natural number `k`, requesting error less than
@@ -101,8 +107,11 @@ the numerical reparameterization, not a runtime guarantee for reading
 arbitrarily verbose rational encodings. We have not yet proved a full
 equivalence between machine models with different accuracy encodings.
 
-Also still pending: Levin's moment condition, fixed-budget/time-bounded
-classes, and randomized reduction closure results. Oracle execution and
+Also still pending: Levin's moment condition and randomized fixed-budget/time-bounded
+classes. Deterministic fixed-budget/time-bounded classes and Corollary 2.1 are
+implemented; see [section2-corollaries.md](section2-corollaries.md) for the
+completed quantitative runtime results and their qualifications. Randomized reduction closure
+is not a stated Section 2 result. Oracle execution and
 Definition 2.2 (including domination) are implemented. Lemma 2.2(2), heuristic
 closure, is proved with genuine deterministic machine certificates. Errorless
 closure requires an explicit additional support condition or a supplied globally
@@ -212,6 +221,7 @@ lake env lean Tests/Amplification.lean
 lake env lean Tests/ExponentialAmplification.lean
 lake env lean Tests/Reductions.lean
 lake env lean Tests/ReductionClosure.lean
+lake env lean Tests/Corollaries.lean
 ```
 
 The tests include constant languages, machine-certified deterministic to

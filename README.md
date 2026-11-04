@@ -32,7 +32,9 @@ interval as an unrestricted class equivalence. Deterministic oracle execution an
 definitions are implemented. Heuristic reductions preserve `HeurP`; errorless
 closure is proved with an explicit support-preservation hypothesis or a globally
 correct target solver. See [the closure notes](docs/section2-closure.md) for the
-support issue in the paper's stated errorless argument.
+support issue in the paper's stated errorless argument. Fixed-budget closure
+(Corollary 2.1) and the cutoff/runtime infrastructure are described in
+[the corollary notes](docs/section2-corollaries.md).
 
 Additional checks:
 
@@ -43,4 +45,5 @@ lake env lean Tests/Amplification.lean
 lake env lean Tests/ExponentialAmplification.lean
 lake env lean Tests/Reductions.lean
 lake env lean Tests/ReductionClosure.lean
+lake env lean Tests/Corollaries.lean
 ```
