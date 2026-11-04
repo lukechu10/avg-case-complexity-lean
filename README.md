@@ -28,8 +28,8 @@ complexity of AvgBPP*. See:
 Constant-threshold and efficient exponential-error amplification, as well as
 `AvgBPP ⊆ HeurBPP`, are implemented. The documented downward-amplification
 result records a caveat about interpreting the paper's upper-threshold
-interval as an unrestricted class equivalence. This remains a partial formalization; oracle reductions are not yet
-implemented.
+interval as an unrestricted class equivalence. Deterministic oracle execution and the distributional Turing-reduction
+definitions are implemented; their closure theorems are not yet proved.
 
 Additional checks:
 
@@ -38,4 +38,5 @@ lake env lean Tests/Accuracy.lean
 lake env lean Tests/Classes.lean
 lake env lean Tests/Amplification.lean
 lake env lean Tests/ExponentialAmplification.lean
+lake env lean Tests/Reductions.lean
 ```

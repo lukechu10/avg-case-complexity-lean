@@ -14,6 +14,10 @@ All definitions live in namespace `AverageCaseComplexity`.
 | `Classes` | Machine-certified deterministic/randomized schemes; `AvgP`, `AvgBPP`, `HeurP`, `HeurBPP`; class inclusions and `WithPSamp` |
 | `Amplification` | Constant-error amplification, general threshold conversions, and `AvgBPP.toHeurBPP` |
 | `Amplification.Exponential` | Flat plurality, Hoeffding tail, certified polynomial-time exponential-error amplification, and an equivalent characterization of `AvgBPP` |
+| `Distributions.WordMass` | Mass at a word's own length and its equivalence with ensemble support |
+| `Reductions.OracleMachine` | Deterministic finite-control oracle-machine execution, exact query traces, library-program agreement, and clock-derived query bounds |
+| `Reductions.OracleScheme` | Uniform polynomial halting certificates, valid encoded answers, typed oracle programs, and queried-at-least-once indicators |
+| `Reductions.Definitions` | Errorless and heuristic distributional Turing reductions, exceptional sets, and domination (Definition 2.2) |
 
 We explicitly extend the paper's positive-length ensembles to length zero.
 `Accuracy` is now a positive natural number `k`, requesting error less than
@@ -46,10 +50,13 @@ imports and `Cslib` / `Turing` namespaces.
 - Deterministic computation can reuse
   `Turing.MultiTapeTM.ComputableTidilyInPolyTime` from
   `Complexity.Computability.Machines.Turing.MultiTape.Complexity.PolyTime`.
-- Future oracle reductions can use `ProbOracleComp` / `WordOracleComp` and
-  the oracle machine APIs in `Complexity.Computability.Probabilistic.Oracle`.
-  Their exact deterministic specialization and query trace interface still
-  need to be selected when implementing Definition 2.2.
+- Deterministic reductions now use `MultiTapeMachine` with `Choose := Id`,
+  binary alphabet, finite control, and one oracle channel. `PolyTimeOracleScheme`
+  requires actual halting by a polynomial clock for every Boolean language oracle.
+  `Machine.Program` connects this execution to `OracleComp` for later simulation.
+  See [section2-reductions.md](section2-reductions.md) for the API audit and exact
+  conventions; the probabilistic `IsOraclePPTOn` predicate is not substituted
+  for a deterministic halting certificate.
 
 Do not use `Cslib.TimeM` alone as a machine-efficiency certificate: it adds
 user-specified costs rather than verifying execution time.
@@ -93,7 +100,9 @@ arbitrarily verbose rational encodings. We have not yet proved a full
 equivalence between machine models with different accuracy encodings.
 
 Also still pending: Levin's moment condition, fixed-budget/time-bounded
-classes, oracle reductions and domination, and the Section 2 reduction theorems. The mathematical specification is in
+classes, and the Section 2 reduction closure theorems. Oracle execution and
+Definition 2.2 (including domination) are now implemented, but Lemma 2.2 has
+not been started, pending user verification of the definitions. The mathematical specification is in
 `section2-definitions.md`.
 
 ## Amplification results
@@ -196,6 +205,7 @@ lake env lean Tests/Accuracy.lean
 lake env lean Tests/Classes.lean
 lake env lean Tests/Amplification.lean
 lake env lean Tests/ExponentialAmplification.lean
+lake env lean Tests/Reductions.lean
 ```
 
 The tests include constant languages, machine-certified deterministic to
