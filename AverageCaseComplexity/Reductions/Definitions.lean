@@ -19,7 +19,10 @@ Its mass bound is non-strict, unlike the strict usefulness/error bounds.
 
 We use `n + k + 2`, the encoded-input length plus one, as polynomial size
 parameter. For positive `n` this is polynomially equivalent to the paper's
-`n/δ = n*k`. It also defines meaningful bounds at length zero.
+`n/δ = n*k`. At `n = 0` this is an intentional deviation: the parameter is
+`k + 2`, rather than zero, so the domination factor may grow polynomially
+with accuracy instead of being bounded by a constant `p(0)`. The paper's
+positive-length ensembles do not require this additional length-zero case.
 -/
 
 namespace AverageCaseComplexity

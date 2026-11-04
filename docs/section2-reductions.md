@@ -86,6 +86,13 @@ to this convention is not proved here. Distributional
 correctness, usefulness, and domination are evaluated only with that target
 oracle.
 
+We retain this uniform certificate for the planned formalization. The later
+completeness construction uses a two-query truth-table reduction, so there is
+no need to represent arbitrary target-only-efficient machines to express that
+construction. Its query generation and processing of either Boolean reply
+must still be certified polynomial-time; two calls alone do not establish
+that bound. No general equivalence/watchdog theorem is required for this scope.
+
 The query trace is proof instrumentation, not additional charged machine work.
 `interpret_programFrom_withTrace` proves that logging calls during interpretation
 of the library's machine program gives exactly the recorded execution trace.
@@ -113,12 +120,27 @@ sum. `Domination` requires
   ∀ y, queryMass ... E y ≤ c * (n+k+2)^d * D'.wordMass y.
 ```
 
-The global majorant uses encoded size `n+k+2`, which equals encoded input
-length plus one. For positive `n`, this is polynomially equivalent to the
-paper's `n/δ = n*k`; our extension also gives meaningful bounds at `n=0`.
-At length zero this is a deliberate convention, not equivalence with a literal
-`p(0)` bound: the chosen factor can grow with `k`. The paper starts with
-positive-length ensembles.
+### Chosen size convention and explicit deviation at length zero
+
+We deliberately use **`n+k+2` instead of the paper's `n/δ = n*k`** as the
+polynomial size parameter, both for the machine runtime and for domination.
+It equals encoded input length plus one. For `n ≥ 1` and `k ≥ 1`,
+
+```
+n+k+2 ≤ 4*n*k,
+n*k ≤ (n+k+2)^2.
+```
+
+Thus polynomial bounds in either parameter give polynomial bounds in the
+other at positive lengths (with possibly different constants and degrees).
+
+**At `n=0` this is an intentional deviation, not an equivalence claim.**
+The paper's literal parameter `n*k` is zero, so a bound `p(n*k)=p(0)` would
+be constant independently of accuracy. Our parameter is `k+2`, so runtime
+and the domination factor may grow polynomially with the unary accuracy
+index even for the empty input. The paper starts with positive-length
+ensembles; this is our chosen extension to a length-zero ensemble component.
+We do not impose the additional constant-in-`k` restriction at length zero.
 Natural monomials `c*(size)^d` provide a uniform nonnegative polynomial
 majorant rather than an arbitrary asserted bound function.
 
