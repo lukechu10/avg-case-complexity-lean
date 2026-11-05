@@ -9,3 +9,5 @@ import AverageCaseComplexity.Classes
 import AverageCaseComplexity.Amplification
 import AverageCaseComplexity.Amplification.ThresholdCaveat
 import AverageCaseComplexity.Reductions
+-- Provisional §3 skeleton: theorem/construction bodies intentionally contain `sorry`.
+import AverageCaseComplexity.Completeness.TwoQuery
