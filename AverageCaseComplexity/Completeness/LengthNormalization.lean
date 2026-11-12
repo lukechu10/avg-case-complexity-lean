@@ -1,6 +1,7 @@
 module
 
 public import AverageCaseComplexity.Sampling
+public import AverageCaseComplexity.Distributions.WordMass
 
 @[expose] public section
 
@@ -41,5 +42,17 @@ theorem fixedLengthLaw_map_toWord (n : ℕ) (p : PMF Word)
   · simp only [hw, ite_self]
   · simp only [Function.comp_apply, normalizeWord_toWord w (hp w hw), id_eq]
     split_ifs <;> rfl
+
+/-- The word-valued component and the paper's own-length mass agree. -/
+theorem wordDistribution_mass (D : Ensemble) (y : Word) :
+    D.wordDistribution y.length y = D.wordMass y := by
+  classical
+  simp only [Ensemble.wordDistribution, Ensemble.wordMass, Ensemble.prob, eventProb,
+    PMF.map_apply, tsum_fintype]
+  apply Finset.sum_congr rfl
+  intro a _
+  by_cases h : y = a.toWord
+  · rw [ite_eq_left h, ite_eq_left h.symm]
+  · rw [ite_eq_right h, ite_eq_right (Ne.symm h)]
 
 end AverageCaseComplexity.Completeness.TwoQuery

@@ -1,5 +1,6 @@
 import AverageCaseComplexity.Completeness.VoteRuntime
 import AverageCaseComplexity.Completeness.LengthNormalization
+import AverageCaseComplexity.Completeness.SeedMass
 import AverageCaseComplexity.Completeness.CompactCode
 import Lean
 
@@ -65,7 +66,11 @@ example (A : PolyTimeRandomizedScheme)
 -- not included: its dependencies have not yet all been implemented.
 run_cmd do
   let allowed := #[``propext, ``Classical.choice, ``Quot.sound]
-  for decl in #[``decodeSeed_encodeSeed, ``decodeSeed_encodeSeed_eq, ``encodeSeed_length_le,
+  for decl in #[``decodeSeed_encodeSeed, ``decodeSeed_encodeSeed_eq, ``decode_sound,
+      ``decode_encode, ``encode_injective, ``encodeSeed_length_eq, ``encodeSeed_length_le,
+      ``encode_ne_ones, ``sum_injective_le_eventProb, ``seed_fiber_mass_lower,
+      ``finite_bind_apply_le, ``map_apply_eq_eventProb, ``eventProb_mul_le_bind_apply,
+      ``wordDistribution_mass,
       ``frequentBit_eq_of_small_wrong_and_giveUp, ``peak_gt_of_small_wrong_and_giveUp,
       ``fallbackBit_wrong_le_threeQuarters, ``burnIn_tail, ``binary_union_tail_lt,
       ``fixedLengthLaw_map_toWord, ``selfDelimitingCode_efficient, ``encodeSeed_efficient_with,

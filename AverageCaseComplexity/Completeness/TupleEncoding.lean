@@ -104,6 +104,13 @@ theorem encode_injective : Function.Injective encode := by
 theorem decodeSeed_ones (n : ℕ) : decodeSeed (List.replicate n true) = none := by
   simp [decodeSeed, decodeSeedCore, decodeSD]
 
+theorem encode_ne_ones (z : Instance) (n : ℕ) : encode z ≠ List.replicate n true := by
+  intro h
+  have hh : decodeSeed (encodeSeed z.seed) = decodeSeed (List.replicate n true) :=
+    congrArg decodeSeed h
+  rw [decodeSeed_encodeSeed, decodeSeed_ones] at hh
+  cases hh
+
 theorem decodeSeed_encodeSeed_eq (w : Word) (z : Seed) (h : decodeSeed w = some z) :
     encodeSeed z = w := by
   unfold decodeSeed at h
@@ -113,6 +120,24 @@ theorem decodeSeed_encodeSeed_eq (w : Word) (z : Seed) (h : decodeSeed w = some 
       simp only [hc] at h
       split_ifs at h with heq
       simp_all
+
+/-- Successful instance parsing reconstructs the entire input, including
+canonical unary clocks; there are no accepted alternative tuple spellings. -/
+theorem decode_sound (w : Word) (z : Instance) (h : decode w = some z) : encode z = w := by
+  unfold decode at h
+  cases hd : decodeSeed w with
+  | none => simp [hd] at h
+  | some seed =>
+      simp only [hd] at h
+      dsimp at h
+      split_ifs at h with hu
+      have heq := Option.some.inj h
+      cases heq
+      change encodeSeed
+        ⟨seed.machineCode, seed.input, List.replicate seed.clockBits.length true,
+          seed.fallback, seed.samplerCode, List.replicate seed.samplerClockBits.length true⟩ = w
+      rw [← hu.1, ← hu.2]
+      exact decodeSeed_encodeSeed_eq w seed hd
 
 theorem encodeSeed_length_congr (u v : Seed)
     (hM : u.machineCode.length = v.machineCode.length)

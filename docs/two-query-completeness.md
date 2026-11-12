@@ -28,6 +28,9 @@ These modules have no placeholders or additional axioms:
   preservation of distributions already supported at a fixed length.
 - `Completeness/TailBounds.lean`: burn-in estimate, tail monotonicity,
   accepted-fraction estimate, and the binary-word union-tail inequality.
+- `Completeness/SeedMass.lean`: the complete seed-fiber mass lower bound,
+  counting all choices of free input and clock bits by an explicit injection;
+  includes finite-bind upper/lower bounds used in the sampler mass proofs.
 - `Completeness/ThresholdBounds.lean`: independent answer-count upper/lower
   Hoeffding tails and the 90% reliability filter's 95%/85% acceptance bounds.
 - `Completeness/MajorityBounds.lean`: the 80% majority law's pointwise correctness
@@ -36,8 +39,8 @@ These modules have no placeholders or additional axioms:
   exact agreement with the preceding probability laws, and strict PPT
   certificates whenever the base program and repetition count are certified.
 
-`Tests/TwoQueryFoundations.lean` checks that the completed declarations depend
-only on `propext`, `Classical.choice`, and `Quot.sound`. This does **not** certify
+`Tests/TwoQueryFoundations.lean` checks that its listed foundational declarations
+depend only on `propext`, `Classical.choice`, and `Quot.sound`. This does **not** certify
 `complete`, whose transitive dependencies still contain placeholders.
 
 ## Dependency map
@@ -48,11 +51,11 @@ only on `propext`, `Classical.choice`, and `Quot.sound`. This does **not** certi
 | Tuple representation | `Instance`, `Seed`, `encodeSeed`, `decodeSeed`, `encode`, `decode` | Codec, mathematical properties, and encoder runtime implemented; decoder runtime remains |
 | Complete language | `language`, `instanceBit`, `query_answers_differ_iff` | Truth table and elementary PMF inequalities proved; executable bounded evaluation remains outstanding |
 | Algorithm 3.1 | `reliabilityTest`, `sampler`, `samplerLaw`, `distribution` | Generic trial/voting programs and their bounds are proved; actual bounded-code execution, sampler implementation, semantic agreement, and its PPT certificate remain. Fixed output length follows from the stated sampler law; the ensemble is implemented by normalization |
-| Lemma 3.2 | `seed_fiber_mass_lower`, `distribution_mass_lower`, `distribution_mass_upper` | Count the whole seed fiber; combine it with exact bounded sampling and filter acceptance; account for every preimage in the upper bound |
+| Lemma 3.2 | `seed_fiber_mass_lower`, `distribution_mass_lower`, `distribution_mass_upper` | Whole-fiber bound proved without placeholders; sampler lower/upper mass proofs implemented conditional on the outstanding sampler execution and reliability-test interfaces |
 | Lemma 3.1 | `targetProgram`, `targetProgram_correct`, `bad_instances_mass`, `targetProgram_useful`, `avgBPP_of_small_bad_mass` | Generic 80%-majority semantics/runtime and bad-instance mass union bound proved; target-specific universal execution, exhaustive branch, branch decision/runtime, and nested usefulness remain |
 | Theorem 3.1 | `problem_avgBPP`, `distribution_psamp` | Assembly implemented, conditional on outstanding construction and mass-bound proofs |
 | Source preparation | `amplified_witness`, `CompiledSource`, `compile_source` | Amplification and witness assembly implemented; actual compact algorithm and sampler compilation remain |
-| Two-query machine | `query_efficient`, `reduction`, `reduction_trace`, `reduction_run` | Query construction certified; a uniformly halting finite-control machine with exactly two nonadaptive calls and agree-or-give-up processing remains |
+| Two-query machine | `query_efficient`, `reduction`, `reduction_trace`, `reduction_run` | Query construction certified relative to `CompiledSource`'s code-construction fields; a uniformly halting finite-control machine with exactly two nonadaptive calls and agree-or-give-up processing remains |
 | Reduction conditions | `reduction_correct`, `reduction_useful`, `exceptional_mass`, `query_mass_lower`, `reduction_domination`, `reduction_conditions` | Proof bodies implemented from the still-unproved machine, compilation, and sampler mass-bound interfaces; no unconditional support assertion added |
 | Theorem 3.2 | `errorlesslyReducible`, `complete` | Assembly implemented, but still depends on unproved prerequisites |
 
@@ -72,8 +75,9 @@ only on `propext`, `Classical.choice`, and `Quot.sound`. This does **not** certi
 4. A reusable actual-machine constructor composing two efficient query generators
    with oracle calls and agreement/give-up processing. Abstract oracle-program
    semantics alone do not fill `PolyTimeOracleScheme`'s machine fields.
-5. Connect the certified filter to universal execution; prove Algorithm 3.1's
-   mass bounds and the exact target-solver branch. The exact branch must test
+5. Connect the certified filter to universal execution, discharging the sampler
+   law and reliability interfaces used by the mass proofs, and implement the
+   exact target-solver branch. The exact branch must test
    `k ≥ 2^m` without first allocating a prohibitively large unary `2^m`.
 
 `CompiledSource` requires an efficient code constructor as well as compactness
@@ -119,7 +123,8 @@ modify the construction and prove the stronger property.
 lake build AverageCaseComplexity.Completeness.VoteRuntime \
   AverageCaseComplexity.Completeness.TupleEncoding \
   AverageCaseComplexity.Completeness.CompactCode \
-  AverageCaseComplexity.Completeness.LengthNormalization
+  AverageCaseComplexity.Completeness.LengthNormalization \
+  AverageCaseComplexity.Completeness.SeedMass
 lake env lean Tests/TwoQueryAnswerLaw.lean
 lake env lean Tests/TwoQueryEncoding.lean
 lake env lean Tests/TwoQueryFoundations.lean
@@ -127,5 +132,6 @@ lake env lean AverageCaseComplexity/Completeness/TwoQuery.lean
 ```
 
 The foundational tests must pass without placeholders or added postulates.
-The final command still emits `sorry` warnings: final theorem elaboration is
-not yet a proof of completeness.
+CI runs every `Tests/*.lean` file after the library build, including the axiom
+whitelist. The final command still emits `sorry` warnings: final theorem
+elaboration is not yet a proof of completeness.

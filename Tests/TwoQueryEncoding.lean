@@ -11,6 +11,8 @@ example (n : ℕ) : decodeSeed (List.replicate n true) = none := decodeSeed_ones
 example : decode [] = none := by decide
 
 example (u v : Instance) (h : encode u = encode v) : u = v := encode_injective h
+example (w : Word) (z : Instance) (h : decode w = some z) : encode z = w :=
+  decode_sound w z h
 
 -- Parsing cannot silently accept a noncanonical spelling of a seed.
 example (w : Word) (z : Seed) (h : decodeSeed w = some z) : encodeSeed z = w :=

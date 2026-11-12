@@ -6,6 +6,7 @@ public import AverageCaseComplexity.Completeness.TupleEncoding
 public import AverageCaseComplexity.Completeness.LengthNormalization
 public import AverageCaseComplexity.Completeness.CompactCode
 public import AverageCaseComplexity.Completeness.VoteRuntime
+public import AverageCaseComplexity.Completeness.SeedMass
 public import AverageCaseComplexity.Reductions.Closure
 public import Mathlib.Analysis.SpecialFunctions.Exp
 
@@ -175,22 +176,9 @@ theorem distribution_psamp : PSamp distribution := by
   intro n
   exact (distribution_wordDistribution n).symm
 
-/-- Coarse replacement for the paper's logarithmic/exponential prefactor.
-The factor is deliberately weaker, avoiding real-valued logarithms. -/
-def seedDenominator (z : Instance) : ℕ :=
-  2 ^ 20 * ((encode z).length + 1) ^ 10 *
-    2 ^ (z.machineCode.length + z.samplerCode.length)
-
-/-- Uniform seed mass of the entire fiber of irrelevant y,r,σ bits.
-Counting just one seed would introduce an exponential loss in input length. -/
-theorem seed_fiber_mass_lower (z : Instance) :
-    (seedDenominator z : ENNReal)⁻¹ ≤
-      eventProb (uniformEnsemble (encode z).length) (fun w =>
-        ∃ u, decodeSeed w.toWord = some u ∧
-          u.machineCode = z.machineCode ∧ u.input.length = z.input.length ∧
-          u.clockBits.length = z.steps ∧ u.fallback = z.fallback ∧
-          u.samplerCode = z.samplerCode ∧ u.samplerClockBits.length = z.samplerSteps) := by
-  sorry
+theorem distribution_mass_eq_samplerLaw (y : Word) :
+    distribution.wordMass y = samplerLaw y.length y := by
+  rw [← wordDistribution_mass distribution y, distribution_wordDistribution, sampler_eval]
 
 /-- Lemma 3.2(1), with a coarse polynomial encoding prefactor. -/
 theorem distribution_mass_lower (z : Instance) (hz : z.Valid)
@@ -199,13 +187,96 @@ theorem distribution_mass_lower (z : Instance) (hz : z.Valid)
         (boundedSample z.samplerCode z.samplerSteps z.input.length).map
           FixedWord.toWord z.input * (seedDenominator z : ENNReal)⁻¹ ≤
       distribution.wordMass (encode z) := by
-  sorry
+  classical
+  let n := (encode z).length
+  let sample := boundedSample z.samplerCode z.samplerSteps z.input.length
+  let A := (1 - tailBound n) * (sample.map FixedWord.toWord z.input)
+  let E : FixedWord n → Prop := fun w =>
+    ∃ u, decodeSeed w.toWord = some u ∧
+      u.machineCode = z.machineCode ∧ u.input.length = z.input.length ∧
+      u.clockBits.length = z.steps ∧ u.fallback = z.fallback ∧
+      u.samplerCode = z.samplerCode ∧ u.samplerClockBits.length = z.samplerSteps
+  let Q : FixedWord n → PMF Word := fun w =>
+    match decodeSeed w.toWord with
+    | none => PMF.pure w.toWord
+    | some u => (boundedSample u.samplerCode u.samplerClockBits.length u.input.length).bind
+        fun x => (Cslib.ProbComp.eval
+          (reliabilityTest u.machineCode u.clockBits.length x.toWord n)).map fun accept =>
+            if accept then encode ⟨u.machineCode, x.toWord, u.clockBits.length,
+              u.fallback, u.samplerCode, u.samplerClockBits.length⟩
+            else List.replicate n true
+  have hn : 0 < n := by
+    have h := payload_length_le_encode_length z
+    dsimp [n]
+    omega
+  have hones := encode_ne_ones z n
+  have hA : A = eventProb sample (fun x => x.toWord = z.input) * (1 - tailBound n) := by
+    dsimp only [A]
+    rw [map_apply_eq_eventProb, mul_comm]
+  have hQ (w : FixedWord n) (hw : E w) : A ≤ Q w (encode z) := by
+    obtain ⟨u, hd, hM, hlen, ht, hb, hS, hs⟩ := hw
+    dsimp only [Q]
+    simp only [hd]
+    rw [hS, hs, hlen, hM, ht, hb]
+    rw [hA]
+    refine eventProb_mul_le_bind_apply sample _ (encode z)
+      (fun x => x.toWord = z.input) (1 - tailBound n) ?_
+    intro x hx
+    rw [hx]
+    simpa [PMF.map_apply, tsum_fintype, Fintype.sum_bool, hones] using
+      reliabilityTest_accept_lower z.machineCode z.steps z.input n hn hgood
+  have houter : samplerLaw n = (uniformEnsemble n).bind Q := by
+    rw [samplerLaw, Ensemble.wordDistribution, PMF.bind_map]
+    rfl
+  have hseed : (seedDenominator z : ENNReal)⁻¹ ≤ eventProb (uniformEnsemble n) E :=
+    seed_fiber_mass_lower z
+  rw [distribution_mass_eq_samplerLaw, houter]
+  calc
+    _ = (seedDenominator z : ENNReal)⁻¹ * A := by dsimp only [A, sample, n]; ring
+    _ ≤ eventProb (uniformEnsemble n) E * A := by gcongr
+    _ ≤ _ := eventProb_mul_le_bind_apply (uniformEnsemble n) Q (encode z) E A hQ
 
 /-- Lemma 3.2(2); includes all preimages, not just canonical seeds. -/
-theorem distribution_mass_upper (z : Instance) (hz : z.Valid)
+theorem distribution_mass_upper (z : Instance) (_hz : z.Valid)
     (hbad : peak (boundedAnswer z.machineCode z.steps z.input) ≤ (85 / 100 : ENNReal)) :
     distribution.wordMass (encode z) ≤ tailBound (encode z).length := by
-  sorry
+  classical
+  let n := (encode z).length
+  have hones := encode_ne_ones z n
+  rw [distribution_mass_eq_samplerLaw]
+  unfold samplerLaw Ensemble.wordDistribution
+  rw [PMF.bind_map]
+  refine finite_bind_apply_le (uniformEnsemble n) _ (encode z) (tailBound n) ?_
+  intro seed
+  dsimp only [Function.comp_apply]
+  cases hd : decodeSeed seed.toWord with
+  | none =>
+      have hne : encode z ≠ seed.toWord := by
+        intro h
+        rw [← h, show decodeSeed (encode z) = some z.seed from decodeSeed_encodeSeed z.seed] at hd
+        cases hd
+      simp [PMF.pure_apply, hne]
+  | some u =>
+      dsimp only
+      refine finite_bind_apply_le
+        (boundedSample u.samplerCode u.samplerClockBits.length u.input.length)
+        _ (encode z) (tailBound n) ?_
+      intro x
+      let v : Instance := ⟨u.machineCode, x.toWord, u.clockBits.length,
+        u.fallback, u.samplerCode, u.samplerClockBits.length⟩
+      change ((Cslib.ProbComp.eval (reliabilityTest u.machineCode u.clockBits.length x.toWord n)).map
+        (fun accept => if accept then encode v else List.replicate n true)) (encode z) ≤ tailBound n
+      by_cases hv : encode v = encode z
+      · have hi := encode_injective hv
+        have hM := congrArg Instance.machineCode hi
+        have ht := congrArg Instance.steps hi
+        have hx := congrArg Instance.input hi
+        dsimp only [v] at hM ht hx
+        have hprogram : reliabilityTest u.machineCode u.clockBits.length x.toWord n =
+            reliabilityTest z.machineCode z.steps z.input n := by rw [hM, ht, hx]
+        simpa [PMF.map_apply, tsum_fintype, Fintype.sum_bool, hv, hones, hprogram] using
+          reliabilityTest_accept_upper z.machineCode z.steps z.input n hbad
+      · simp [PMF.map_apply, tsum_fintype, Ne.symm hv, hones]
 
 /-- Valid tuples are large enough that the accepted fraction is uniformly
 bounded away from zero; this constant is absorbed by domination. -/
@@ -229,7 +300,8 @@ theorem targetProgram_efficient :
     Cslib.Probability.IsPPTOn schemeInputEncoding answerEncoding targetProgram := by
   sorry
 
-/-- The exponential branch is affordable because accuracy is unary. -/
+/-- Arithmetic bound on the exact branch's enumeration count. The full
+machine-level cost of enumeration and simulation remains to be certified. -/
 theorem exact_branch_budget (m : ℕ) (k : Accuracy) (h : 2 ^ m ≤ k.val) :
     2 ^ m ≤ k.val + 1 := by
   omega
