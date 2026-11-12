@@ -17,7 +17,7 @@ def answerCount (answer : Answer) (answers : List Answer) : ℕ :=
   answers.count answer
 
 /-- A fixed-answer filter and its length are polynomial-time on encoded answer lists. -/
-@[fun_prop] private theorem answerCount_computable (answer : Answer) :
+@[fun_prop] theorem answerCount_computable (answer : Answer) :
     ComputableTidilyInPolyTime (answerCount answer) (encList answerEncoding) encUnary := by
   have htest : ComputableTidilyInDegree
       (fun p : Answer × Answer => decide (p.2 = p.1))

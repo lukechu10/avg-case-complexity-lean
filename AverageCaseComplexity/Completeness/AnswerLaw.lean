@@ -63,4 +63,47 @@ theorem peak_gt_of_small_wrong_and_giveUp (p : PMF Answer) (b : Bool)
     cases b <;> norm_num at hw ⊢ <;> linarith
   exact hb.trans_le (by cases b <;> simp [peak])
 
+/-- The complete-language bit uses the fallback exactly when the simulated
+computation gives up with probability at least one quarter. -/
+noncomputable def fallbackBit (p : PMF Answer) (fallback : Bool) : Bool :=
+  if (1 / 4 : ENNReal) ≤ p none then fallback else frequentBit p
+
+/-- The less frequent Boolean answer has probability at most one half,
+including the tie-breaking case. -/
+theorem frequentBit_wrong_le_half (p : PMF Answer) :
+    p (some (!frequentBit p)) ≤ (1 / 2 : ENNReal) := by
+  have hs := answer_mass_sum p
+  have hn := ENNReal.toReal_nonneg (a := p none)
+  by_cases h : p (some false) < p (some true)
+  · have hr := (ENNReal.toReal_lt_toReal (p.apply_ne_top _) (p.apply_ne_top _)).mpr h
+    simp only [frequentBit, h, decide_true, Bool.not_true]
+    apply (ENNReal.toReal_le_toReal (p.apply_ne_top _) (by finiteness)).mp
+    norm_num
+    linarith
+  · have hr := (ENNReal.toReal_le_toReal (p.apply_ne_top _) (p.apply_ne_top _)).mpr
+      (le_of_not_gt h)
+    simp only [frequentBit, h, decide_false, Bool.not_false]
+    apply (ENNReal.toReal_le_toReal (p.apply_ne_top _) (by finiteness)).mp
+    norm_num
+    linarith
+
+/-- For either fallback choice, the Boolean answer opposite the complete
+language has mass at most three quarters. This is the gap used by its 80%-vote
+solver, independently of how the simulated machine was encoded. -/
+theorem fallbackBit_wrong_le_threeQuarters (p : PMF Answer) (fallback : Bool) :
+    p (some (!fallbackBit p fallback)) ≤ (3 / 4 : ENNReal) := by
+  by_cases hg : (1 / 4 : ENNReal) ≤ p none
+  · simp only [fallbackBit, ite_eq_left hg]
+    have hr := (ENNReal.toReal_le_toReal (by finiteness) (p.apply_ne_top _)).mpr hg
+    norm_num at hr
+    have hs := answer_mass_sum p
+    apply (ENNReal.toReal_le_toReal (p.apply_ne_top _) (by finiteness)).mp
+    cases fallback <;> norm_num <;>
+      linarith [ENNReal.toReal_nonneg (a := p (some false)),
+        ENNReal.toReal_nonneg (a := p (some true))]
+  · simp only [fallbackBit, ite_eq_right hg]
+    exact (frequentBit_wrong_le_half p).trans (by
+      apply (ENNReal.toReal_le_toReal (by finiteness) (by finiteness)).mp
+      norm_num)
+
 end AverageCaseComplexity.Completeness.TwoQuery
