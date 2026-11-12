@@ -1,6 +1,6 @@
 import AverageCaseComplexity.Completeness.VoteRuntime
 import AverageCaseComplexity.Completeness.LengthNormalization
-import AverageCaseComplexity.Completeness.EncodingRuntime
+import AverageCaseComplexity.Completeness.CompactCode
 import Lean
 
 open AverageCaseComplexity AverageCaseComplexity.Completeness.TwoQuery
@@ -22,6 +22,16 @@ example : (2 ^ 3 : ENNReal) * tailBound 3 < (2 ^ 3 : ENNReal)⁻¹ :=
 example : (normalizeWord 4 [true, false]).toWord = [true, false, false, false] := rfl
 example : (normalizeWord 1 [true, false]).toWord = [true] := rfl
 example : (normalizeWord 0 [true]).toWord = [] := rfl
+
+example : specializeCode [] ⟨1, by decide⟩ = [false, true] := by decide
+example : specializeCode [] ⟨2, by decide⟩ = [false, false, true] := by decide
+example : decodeSpecializedCode [false, true, false] = none := by decide
+example (header : Word) (k : Accuracy) :
+    decodeSpecializedCode (specializeCode header k) = some (header, k) := by simp
+example (header : Word) (k : Accuracy) :
+    2 ^ (specializeCode header k).length ≤
+      2 ^ ((Cslib.Kolmogorov.selfDelimitingCode header).length + 1) * (k.val + 1) :=
+  specializeCode_size header k
 
 example (p : PMF Answer) (n : ℕ) (hbad : peak p ≤ (85 / 100 : ENNReal)) :
     reliabilityLaw p (200 * n ^ 2) true ≤ tailBound n :=
@@ -59,6 +69,8 @@ run_cmd do
       ``frequentBit_eq_of_small_wrong_and_giveUp, ``peak_gt_of_small_wrong_and_giveUp,
       ``fallbackBit_wrong_le_threeQuarters, ``burnIn_tail, ``binary_union_tail_lt,
       ``fixedLengthLaw_map_toWord, ``selfDelimitingCode_efficient, ``encodeSeed_efficient_with,
+      ``decodeSpecializedCode_specializeCode, ``decodeSpecializedCode_sound,
+      ``specializeCode_size, ``specializeCode_efficient,
       ``answerCount_upper_tail, ``answerCount_lower_tail,
       ``reliabilityLaw_accept_upper_all, ``reliabilityLaw_accept_lower,
       ``majorityLaw_wrong_lt_quarter, ``majorityLaw_giveUp,
