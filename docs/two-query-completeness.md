@@ -28,6 +28,14 @@ These modules have no placeholders or additional axioms:
   preservation of distributions already supported at a fixed length.
 - `Completeness/TailBounds.lean`: burn-in estimate, tail monotonicity,
   accepted-fraction estimate, and the binary-word union-tail inequality.
+- `Reductions/QueryPreparation.lean`, `SequentialExecution.lean`,
+  `QueryProtocol.lean`, `TwoQueryMachine.lean`, and `StateReindex.lean`:
+  finite-control query writing with no instruction overhead; exact sequential
+  trace semantics and clock padding after genuine halting; a general machine
+  for two arbitrary tidily polynomial-time query functions, with a uniform
+  polynomial clock and exact agree-or-give-up output for every oracle; and
+  exact state reindexing. Packaging this construction into the main reduction
+  remains unfinished. `Tests/TwoQueryMachine.lean` guards its axioms.
 - `Completeness/SeedMass.lean`: the complete seed-fiber mass lower bound,
   counting all choices of free input and clock bits by an explicit injection;
   includes finite-bind upper/lower bounds used in the sampler mass proofs.
@@ -55,7 +63,7 @@ depend only on `propext`, `Classical.choice`, and `Quot.sound`. This does **not*
 | Lemma 3.1 | `targetProgram`, `targetProgram_correct`, `bad_instances_mass`, `targetProgram_useful`, `avgBPP_of_small_bad_mass` | Generic 80%-majority semantics/runtime and bad-instance mass union bound proved; target-specific universal execution, exhaustive branch, branch decision/runtime, and nested usefulness remain |
 | Theorem 3.1 | `problem_avgBPP`, `distribution_psamp` | Assembly implemented, conditional on outstanding construction and mass-bound proofs |
 | Source preparation | `amplified_witness`, `CompiledSource`, `compile_source` | Amplification and witness assembly implemented; actual compact algorithm and sampler compilation remain |
-| Two-query machine | `query_efficient`, `reduction`, `reduction_trace`, `reduction_run` | Query construction certified relative to `CompiledSource`'s code-construction fields; a uniformly halting finite-control machine with exactly two nonadaptive calls and agree-or-give-up processing remains |
+| Two-query machine | `query_efficient`, `reduction`, `reduction_trace`, `reduction_run` | Query construction certified relative to `CompiledSource`'s code-construction fields; general finite-control two-query construction and state reindexing proved in `Reductions/TwoQueryMachine.lean` and `StateReindex.lean`; instantiation and packaging as `W.reduction` remain |
 | Reduction conditions | `reduction_correct`, `reduction_useful`, `exceptional_mass`, `query_mass_lower`, `reduction_domination`, `reduction_conditions` | Proof bodies implemented from the still-unproved machine, compilation, and sampler mass-bound interfaces; no unconditional support assertion added |
 | Theorem 3.2 | `errorlesslyReducible`, `complete` | Assembly implemented, but still depends on unproved prerequisites |
 
@@ -72,9 +80,9 @@ depend only on `propext`, `Classical.choice`, and `Quot.sound`. This does **not*
    interpreter's semantics. Its linear `2^|M_k|` bound is proved, but constructing
    that word does not by itself implement accuracy specialization of a machine.
    The interpreter must reconstruct unary accuracy within its certified clock.
-4. A reusable actual-machine constructor composing two efficient query generators
-   with oracle calls and agreement/give-up processing. Abstract oracle-program
-   semantics alone do not fill `PolyTimeOracleScheme`'s machine fields.
+4. Instantiate `exists_twoQuery_machine` with the two certified query functions,
+   reindex its finite state type, and package its uniform clock and execution
+   theorem as `CompiledSource.reduction`.
 5. Connect the certified filter to universal execution, discharging the sampler
    law and reliability interfaces used by the mass proofs, and implement the
    exact target-solver branch. The exact branch must test

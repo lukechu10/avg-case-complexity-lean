@@ -16,9 +16,9 @@ namespace OracleMachine
 /-- Run for at most `fuel` instructions, retaining the final configuration and the
 chronological sequence of oracle interactions. Each submitted request is the current query buffer;
 the one-bit reply is installed on the answer tape. -/
-def runFrom {tapes states : ℕ} (M : OracleMachine tapes states) (L : Language) :
-    ℕ → (cfg : Turing.MultiTapeMachine.Config tapes Bool (Fin states) Unit input) →
-      Turing.MultiTapeMachine.Config tapes Bool (Fin states) Unit input × List (Word × Bool)
+def runFrom {tapes : ℕ} {State : Type} (M : Turing.MultiTapeMachine tapes Bool State Unit Id) (L : Language) :
+    ℕ → (cfg : Turing.MultiTapeMachine.Config tapes Bool State Unit input) →
+      Turing.MultiTapeMachine.Config tapes Bool State Unit input × List (Word × Bool)
   | 0, cfg => (cfg, [])
   | fuel + 1, cfg =>
       match cfg.tapes.state with
@@ -32,28 +32,74 @@ def runFrom {tapes states : ℕ} (M : OracleMachine tapes states) (L : Language)
               let (final, trace) := runFrom M L fuel (cfg.receive () next [L request])
               (final, (request, L request) :: trace)
 
+/-- A halted machine neither changes its tapes nor emits further queries. -/
+theorem runFrom_halted {tapes : ℕ} {State : Type}
+    (M : Turing.MultiTapeMachine tapes Bool State Unit Id) (L : Language)
+    (fuel : ℕ) (cfg : Turing.MultiTapeMachine.Config tapes Bool State Unit input)
+    (h : cfg.tapes.state = none) : runFrom M L fuel cfg = (cfg, []) := by
+  cases fuel <;> simp [runFrom, h]
+
+/-- Splitting an instruction budget concatenates the chronological traces. -/
+theorem runFrom_add {tapes : ℕ} {State : Type}
+    (M : Turing.MultiTapeMachine tapes Bool State Unit Id) (L : Language)
+    (first second : ℕ) (cfg : Turing.MultiTapeMachine.Config tapes Bool State Unit input) :
+    runFrom M L (first + second) cfg =
+      let mid := runFrom M L first cfg
+      let final := runFrom M L second mid.1
+      (final.1, mid.2 ++ final.2) := by
+  induction first generalizing cfg with
+  | zero => simp [runFrom]
+  | succ first ih =>
+      cases hs : cfg.tapes.state with
+      | none =>
+          rw [runFrom_halted M L (first + 1 + second) cfg hs]
+          simp [runFrom, hs, runFrom_halted M L second cfg hs]
+      | some state =>
+          cases ht : M.tr state cfg.tapes.inputSymbol cfg.tapes.workTapeSymbols cfg.answerSymbols with
+          | step action symbol move =>
+              simpa only [Nat.succ_add, runFrom, hs, ht] using ih (cfg.step action symbol move)
+          | query oracle next =>
+              cases oracle
+              simpa only [Nat.succ_add, runFrom, hs, ht, Prod.fst, Prod.snd,
+                List.cons_append] using congrArg
+                  (fun result => (result.1, ((cfg.channels ()).queryBuffer,
+                    L (cfg.channels ()).queryBuffer) :: result.2))
+                  (ih (cfg.receive () next [L (cfg.channels ()).queryBuffer]))
+
+/-- A genuinely halted run is unchanged by any larger instruction budget. -/
+theorem runFrom_eq_of_halted {tapes : ℕ} {State : Type}
+    (M : Turing.MultiTapeMachine tapes Bool State Unit Id) (L : Language)
+    (first larger : ℕ) (cfg : Turing.MultiTapeMachine.Config tapes Bool State Unit input)
+    (hle : first ≤ larger) (h : (runFrom M L first cfg).1.tapes.state = none) :
+    runFrom M L larger cfg = runFrom M L first cfg := by
+  obtain ⟨extra, rfl⟩ := Nat.exists_eq_add_of_le hle
+  rw [runFrom_add]
+  dsimp only
+  rw [runFrom_halted M L extra _ h]
+  simp
+
 /-- Run from the standard blank-channel initial configuration. -/
-def run {tapes states : ℕ} (M : OracleMachine tapes states) (L : Language)
+def run {tapes : ℕ} {State : Type} (M : Turing.MultiTapeMachine tapes Bool State Unit Id) (L : Language)
     (fuel : ℕ) (input : Word) := runFrom M L fuel (M.initialConfig input)
 
 /-- The generic machine-program execution with one typed oracle query per machine request. -/
-def programFrom {tapes states : ℕ} (M : OracleMachine tapes states) (fuel : ℕ)
-    (cfg : Turing.MultiTapeMachine.Config tapes Bool (Fin states) Unit input) :
+def programFrom {tapes : ℕ} {State : Type} (M : Turing.MultiTapeMachine tapes Bool State Unit Id) (fuel : ℕ)
+    (cfg : Turing.MultiTapeMachine.Config tapes Bool State Unit input) :
     Cslib.OracleComp (fun _ : Word => Bool)
-      (Turing.MultiTapeMachine.Config tapes Bool (Fin states) Unit input) :=
+      (Turing.MultiTapeMachine.Config tapes Bool State Unit input) :=
   M.runConfigFrom (spec := fun _ : Word => Bool) pure
     (fun _ request => List.singleton <$> Cslib.OracleComp.query request) fuel cfg
 
 /-- Generic program execution from blank channels. -/
-def program {tapes states : ℕ} (M : OracleMachine tapes states) (fuel : ℕ)
+def program {tapes : ℕ} {State : Type} (M : Turing.MultiTapeMachine tapes Bool State Unit Id) (fuel : ℕ)
     (input : Word) : Cslib.OracleComp (fun _ : Word => Bool)
-      (Turing.MultiTapeMachine.Config tapes Bool (Fin states) Unit input) :=
+      (Turing.MultiTapeMachine.Config tapes Bool State Unit input) :=
   programFrom M fuel (M.initialConfig input)
 
 /-- Interpreting the generic program by `L` recovers the final configuration of `runFrom`. -/
-theorem interpret_programFrom {tapes states : ℕ} (M : OracleMachine tapes states)
+theorem interpret_programFrom {tapes : ℕ} {State : Type} (M : Turing.MultiTapeMachine tapes Bool State Unit Id)
     (L : Language) (fuel : ℕ)
-    (cfg : Turing.MultiTapeMachine.Config tapes Bool (Fin states) Unit input) :
+    (cfg : Turing.MultiTapeMachine.Config tapes Bool State Unit input) :
     Cslib.OracleComp.interpret (fun request : Word => (pure (L request) : Id Bool))
       (programFrom M fuel cfg) = (runFrom M L fuel cfg).1 := by
   induction fuel generalizing cfg with
@@ -91,9 +137,9 @@ theorem interpret_programFrom {tapes states : ℕ} (M : OracleMachine tapes stat
 /-- Interpreting the library machine program with a chronological query logger recovers
 both the final configuration and exactly the trace recorded by `runFrom`.
 The initial log is retained as a prefix; logging is semantic instrumentation. -/
-theorem interpret_programFrom_withTrace {tapes states : ℕ} (M : OracleMachine tapes states)
+theorem interpret_programFrom_withTrace {tapes : ℕ} {State : Type} (M : Turing.MultiTapeMachine tapes Bool State Unit Id)
     (L : Language) (fuel : ℕ)
-    (cfg : Turing.MultiTapeMachine.Config tapes Bool (Fin states) Unit input)
+    (cfg : Turing.MultiTapeMachine.Config tapes Bool State Unit input)
     (seen : List (Word × Bool)) :
     (Cslib.OracleComp.interpret (m := StateM (List (Word × Bool)))
       (fun request : Word => (fun log => (L request, log ++ [(request, L request)])))
@@ -124,9 +170,9 @@ theorem interpret_programFrom_withTrace {tapes states : ℕ} (M : OracleMachine 
         exact hi
 
 /-- Every partial run makes at most one oracle call per unit of fuel. -/
-theorem queryCount_runFrom_le {tapes states : ℕ} (M : OracleMachine tapes states)
+theorem queryCount_runFrom_le {tapes : ℕ} {State : Type} (M : Turing.MultiTapeMachine tapes Bool State Unit Id)
     (L : Language) (fuel : ℕ)
-    (cfg : Turing.MultiTapeMachine.Config tapes Bool (Fin states) Unit input) :
+    (cfg : Turing.MultiTapeMachine.Config tapes Bool State Unit input) :
     ((runFrom M L fuel cfg).2).length ≤ fuel := by
   induction fuel generalizing cfg with
   | zero => simp [runFrom]
@@ -145,9 +191,9 @@ theorem queryCount_runFrom_le {tapes states : ℕ} (M : OracleMachine tapes stat
 
 /-- A query submitted during a partial run is no longer than the initial buffer plus
 its remaining instruction budget. -/
-theorem requestLength_runFrom_le {tapes states : ℕ} (M : OracleMachine tapes states)
+theorem requestLength_runFrom_le {tapes : ℕ} {State : Type} (M : Turing.MultiTapeMachine tapes Bool State Unit Id)
     (L : Language) (fuel : ℕ)
-    (cfg : Turing.MultiTapeMachine.Config tapes Bool (Fin states) Unit input) :
+    (cfg : Turing.MultiTapeMachine.Config tapes Bool State Unit input) :
     ∀ entry ∈ (runFrom M L fuel cfg).2,
       entry.1.length ≤ (cfg.channels ()).queryBuffer.length + fuel := by
   induction fuel generalizing cfg with
@@ -181,20 +227,20 @@ theorem requestLength_runFrom_le {tapes states : ℕ} (M : OracleMachine tapes s
                 omega
 
 /-- From blank channels, every oracle request has length at most the clock. -/
-theorem requestLength_run_le {tapes states : ℕ} (M : OracleMachine tapes states)
+theorem requestLength_run_le {tapes : ℕ} {State : Type} (M : Turing.MultiTapeMachine tapes Bool State Unit Id)
     (L : Language) (fuel : ℕ) (input : Word) :
     ∀ entry ∈ (run M L fuel input).2, entry.1.length ≤ fuel := by
   simpa [run, Turing.MultiTapeMachine.initialConfig] using
     (requestLength_runFrom_le M L fuel (M.initialConfig input))
 
 /-- The blank-channel run also satisfies the query-count clock bound. -/
-theorem queryCount_run_le {tapes states : ℕ} (M : OracleMachine tapes states)
+theorem queryCount_run_le {tapes : ℕ} {State : Type} (M : Turing.MultiTapeMachine tapes Bool State Unit Id)
     (L : Language) (fuel : ℕ) (input : Word) :
     (run M L fuel input).2.length ≤ fuel := by
   exact queryCount_runFrom_le M L fuel (M.initialConfig input)
 
 /-- Interpreting the generic blank-channel program by `L` recovers the final configuration. -/
-theorem interpret_program {tapes states : ℕ} (M : OracleMachine tapes states)
+theorem interpret_program {tapes : ℕ} {State : Type} (M : Turing.MultiTapeMachine tapes Bool State Unit Id)
     (L : Language) (fuel : ℕ) (input : Word) :
     Cslib.OracleComp.interpret (fun request : Word => (pure (L request) : Id Bool))
       (program M fuel input) = (run M L fuel input).1 := by

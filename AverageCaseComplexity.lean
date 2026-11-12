@@ -9,5 +9,7 @@ import AverageCaseComplexity.Classes
 import AverageCaseComplexity.Amplification
 import AverageCaseComplexity.Amplification.ThresholdCaveat
 import AverageCaseComplexity.Reductions
+import AverageCaseComplexity.Reductions.TwoQueryMachine
+import AverageCaseComplexity.Reductions.StateReindex
 -- In-progress §3 development: final completeness still depends on `sorry` prerequisites.
 import AverageCaseComplexity.Completeness.TwoQuery
