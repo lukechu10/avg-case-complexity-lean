@@ -1,4 +1,4 @@
-# Two-query completeness: proof skeleton
+# Two-query completeness: implementation in progress
 
 `AverageCaseComplexity/Completeness/TwoQuery.lean` develops Itsykson §3,
 Theorems 3.1–3.2 and their prerequisites. **Completeness is not yet proved:**
@@ -6,32 +6,79 @@ major executable constructions and foundational theorems still have explicit
 `sorry` placeholders. The final assembly has a proof body, but its dependencies
 still include `sorryAx`; successful elaboration is not a completeness certificate.
 
-`Completeness/AnswerLaw.lean` is a separate, placeholder-free module proving the
-three-answer probability facts and agreement/give-up identities. The amplification
-bridge and several conditional reduction proofs are also implemented in
-`TwoQuery.lean`; they do not eliminate the outstanding construction obligations.
+## Completed foundational modules
+
+These modules have no placeholders or additional axioms:
+
+- `Completeness/AnswerLaw.lean`: frequent-answer and peak inequalities,
+  agreement/give-up identities, and the complete-language truth table's
+  three-quarter upper bound on wrong-answer mass.
+- `Completeness/TupleEncoding.lean`: executable checked binary codec, both
+  directions of seed round trips, canonical instance round trips, injectivity,
+  all-ones rejection, length invariance, logarithmic overhead, and payload bounds.
+  The decoder's machine-level efficiency proof remains to be supplied.
+- `Completeness/EncodingRuntime.lean`: machine-certified self-delimiting length
+  headers and seed encoding from certified field constructors, used by the
+  source query-construction theorem.
+- `Completeness/CompactCode.lean`: checked round-trip decoding of a fixed
+  machine header plus a raw binary accuracy suffix, a machine-certified code
+  constructor, and the sharp linear bound on the exponential code length.
+  This is the representation layer, not yet the compiler's semantic bridge.
+- `Completeness/LengthNormalization.lean`: truncation/padding and exact
+  preservation of distributions already supported at a fixed length.
+- `Completeness/TailBounds.lean`: burn-in estimate, tail monotonicity,
+  accepted-fraction estimate, and the binary-word union-tail inequality.
+- `Completeness/ThresholdBounds.lean`: independent answer-count upper/lower
+  Hoeffding tails and the 90% reliability filter's 95%/85% acceptance bounds.
+- `Completeness/MajorityBounds.lean`: the 80% majority law's pointwise correctness
+  and give-up bounds, using the complete-language truth table.
+- `Completeness/VoteRuntime.lean`: executable repetition and threshold voting,
+  exact agreement with the preceding probability laws, and strict PPT
+  certificates whenever the base program and repetition count are certified.
+
+`Tests/TwoQueryFoundations.lean` checks that the completed declarations depend
+only on `propext`, `Classical.choice`, and `Quot.sound`. This does **not** certify
+`complete`, whose transitive dependencies still contain placeholders.
 
 ## Dependency map
 
 | Stage | Principal declarations | What remains to implement/prove |
 | --- | --- | --- |
 | Machine representation | `boundedAnswer`, `boundedSample`, `exactLanguageBit`, `compile_algorithm`, `compile_sampler` | Binary codes for actual finite-control fair-coin machines; bounded universal interpretation; exhaustive coin enumeration; strict polynomial simulation overhead; exact correspondence with existing PPT certificates |
-| Tuple representation | `Instance`, `Seed`, `encodeSeed`, `decodeSeed`, `encode`, `decode` | Self-delimiting binary encoding, round trips, length invariance, logarithmic overhead, payload lower bound, and all-ones rejection |
+| Tuple representation | `Instance`, `Seed`, `encodeSeed`, `decodeSeed`, `encode`, `decode` | Codec, mathematical properties, and encoder runtime implemented; decoder runtime remains |
 | Complete language | `language`, `instanceBit`, `query_answers_differ_iff` | Truth table and elementary PMF inequalities proved; executable bounded evaluation remains outstanding |
-| Algorithm 3.1 | `reliabilityTest`, `sampler`, `samplerLaw`, `distribution` | Executable independent trials, Chernoff bounds, exact sampler law, fixed output length, and strict PPT certificate |
+| Algorithm 3.1 | `reliabilityTest`, `sampler`, `samplerLaw`, `distribution` | Generic trial/voting programs and their bounds are proved; actual bounded-code execution, sampler implementation, semantic agreement, and its PPT certificate remain. Fixed output length follows from the stated sampler law; the ensemble is implemented by normalization |
 | Lemma 3.2 | `seed_fiber_mass_lower`, `distribution_mass_lower`, `distribution_mass_upper` | Count the whole seed fiber; combine it with exact bounded sampling and filter acceptance; account for every preimage in the upper bound |
-| Lemma 3.1 | `targetProgram`, `targetProgram_correct`, `bad_instances_mass`, `targetProgram_useful`, `avgBPP_of_small_bad_mass` | 80%-majority solver, exhaustive branch when `k ≥ 2^m`, polynomial runtime in unary accuracy, and nested usefulness |
-| Theorem 3.1 | `problem_avgBPP`, `distribution_psamp` | Assemble target membership and samplability |
-| Source preparation | `amplified_witness`, `CompiledSource`, `compile_source` | Amplify internal error/give-up thresholds to 0.01; specialize accuracy using compact binary code; compile the exact source sampler |
-| Two-query machine | `query_efficient`, `reduction`, `reduction_trace`, `reduction_run` | Certify actual query construction and a uniformly halting finite-control machine; exactly two nonadaptive calls; agree-or-give-up reply processing |
-| Reduction conditions | `reduction_correct`, `reduction_useful`, `exceptional_mass`, `query_mass_lower`, `reduction_domination`, `reduction_conditions` | Pointwise correctness on source support, exceptional-set bound, polynomial mass ratio, and collision-free query fibers |
+| Lemma 3.1 | `targetProgram`, `targetProgram_correct`, `bad_instances_mass`, `targetProgram_useful`, `avgBPP_of_small_bad_mass` | Generic 80%-majority semantics/runtime and bad-instance mass union bound proved; target-specific universal execution, exhaustive branch, branch decision/runtime, and nested usefulness remain |
+| Theorem 3.1 | `problem_avgBPP`, `distribution_psamp` | Assembly implemented, conditional on outstanding construction and mass-bound proofs |
+| Source preparation | `amplified_witness`, `CompiledSource`, `compile_source` | Amplification and witness assembly implemented; actual compact algorithm and sampler compilation remain |
+| Two-query machine | `query_efficient`, `reduction`, `reduction_trace`, `reduction_run` | Query construction certified; a uniformly halting finite-control machine with exactly two nonadaptive calls and agree-or-give-up processing remains |
+| Reduction conditions | `reduction_correct`, `reduction_useful`, `exceptional_mass`, `query_mass_lower`, `reduction_domination`, `reduction_conditions` | Proof bodies implemented from the still-unproved machine, compilation, and sampler mass-bound interfaces; no unconditional support assertion added |
 | Theorem 3.2 | `errorlesslyReducible`, `complete` | Assembly implemented, but still depends on unproved prerequisites |
 
-The intended first implementation step is the binary tuple/machine-code layer.
-The source compilation bridge is substantial: machine codes cannot be arbitrary
-PMFs, and short code length does not imply polynomial-time code construction.
-`CompiledSource` therefore explicitly requires an efficient code constructor as
-well as its compactness and semantic correspondence.
+## Highest-priority remaining infrastructure
+
+1. Checked raw machine codes and an executable fair-coin universal interpreter,
+   with exact bounded semantics and polynomial physical simulation overhead.
+   The library's deterministic universal simulator and saved-coin replay are
+   building blocks, not yet this interface.
+2. Compile actual PPT witnesses and exact samplers into those codes. Make the
+   witnesses intrinsically clocked before increasing the execution bound:
+   arbitrary extra execution after an original cutoff can change the output law.
+3. Connect `CompactCode`'s certified binary-suffix constructor to the universal
+   interpreter's semantics. Its linear `2^|M_k|` bound is proved, but constructing
+   that word does not by itself implement accuracy specialization of a machine.
+   The interpreter must reconstruct unary accuracy within its certified clock.
+4. A reusable actual-machine constructor composing two efficient query generators
+   with oracle calls and agreement/give-up processing. Abstract oracle-program
+   semantics alone do not fill `PolyTimeOracleScheme`'s machine fields.
+5. Connect the certified filter to universal execution; prove Algorithm 3.1's
+   mass bounds and the exact target-solver branch. The exact branch must test
+   `k ≥ 2^m` without first allocating a prohibitively large unary `2^m`.
+
+`CompiledSource` requires an efficient code constructor as well as compactness
+and semantic correspondence; short code length alone does not imply efficient
+code construction.
 
 ## Conventions and deliberate adjustments
 
@@ -66,10 +113,19 @@ issue in `docs/section2-closure.md`. Any later use of errorless `AvgP` closure
 must retain its additional support/global-correctness hypothesis, or separately
 modify the construction and prove the stronger property.
 
-## Checking the skeleton
+## Validation
 
 ```sh
+lake build AverageCaseComplexity.Completeness.VoteRuntime \
+  AverageCaseComplexity.Completeness.TupleEncoding \
+  AverageCaseComplexity.Completeness.CompactCode \
+  AverageCaseComplexity.Completeness.LengthNormalization
+lake env lean Tests/TwoQueryAnswerLaw.lean
+lake env lean Tests/TwoQueryEncoding.lean
+lake env lean Tests/TwoQueryFoundations.lean
 lake env lean AverageCaseComplexity/Completeness/TwoQuery.lean
 ```
 
-Expected result: no elaboration errors; `sorry` warnings are intentional.
+The foundational tests must pass without placeholders or added postulates.
+The final command still emits `sorry` warnings: final theorem elaboration is
+not yet a proof of completeness.

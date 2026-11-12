@@ -36,10 +36,12 @@ support issue in the paper's stated errorless argument. Fixed-budget closure
 (Corollary 2.1) and the cutoff/runtime infrastructure are described in
 [the corollary notes](docs/section2-corollaries.md).
 
-Work on Section 3 has started with a [two-query completeness proof skeleton](docs/two-query-completeness.md)
-(`AverageCaseComplexity/Completeness/TwoQuery.lean`). Its theorem statements and
-construction interfaces are provisional: all proofs and several constructions
-are intentionally left as `sorry`, so this is not yet a certified completeness result.
+Section 3's [two-query completeness development](docs/two-query-completeness.md)
+(`AverageCaseComplexity/Completeness/TwoQuery.lean`) now has a checked binary
+codec, probability bounds, certified repetition/voting, and conditional reduction
+proofs. Universal execution, compact compilation, and other construction
+prerequisites still contain `sorry`: the final `complete` theorem is **not yet
+certified**, despite having its assembly proof filled in.
 
 Additional checks:
 
