@@ -1,19 +1,20 @@
 module
 
-public import AverageCaseComplexity.Amplification
+public import AverageCaseComplexity.Completeness.AnswerLaw
 public import AverageCaseComplexity.Reductions.Closure
 public import Mathlib.Analysis.SpecialFunctions.Exp
 
 @[expose] public section
 
 /-!
-# Skeleton: Itsykson's two-query complete problem (§3, Theorems 3.1–3.2)
+# Itsykson's two-query complete problem (§3, Theorems 3.1–3.2), in progress
 
-This file is a proof plan, NOT a completed formalization. Every theorem is left
-with `sorry`; executable constructions not yet implemented also have explicit
-`sorry` bodies. In particular, the universal interpreter and its compilers must
-ultimately use the library's finite-control fair-coin machines, not arbitrary
-PMFs supplied with an asserted running time.
+This is NOT a completed formalization. Foundational theorems and executable
+constructions still have explicit `sorry` bodies. Conditional reduction proofs
+and final assembly do not remove those dependencies. In particular, the
+universal interpreter and its compilers must ultimately use the library's
+finite-control fair-coin machines, not arbitrary PMFs supplied with an asserted
+running time. The separate `AnswerLaw` module has no placeholders.
 
 Dependency order:
 1. binary machine codes and logarithmic-overhead tuple encoding;
@@ -136,13 +137,6 @@ theorem input_length_le_encode_length (z : Instance) :
 
 /-! ## 2. The complete language and its two-answer truth table -/
 
-/-- Ties between Boolean answers are resolved in favor of false. -/
-noncomputable def frequentBit (p : PMF Answer) : Bool :=
-  decide (p (some false) < p (some true))
-
-noncomputable def peak (p : PMF Answer) : ENNReal :=
-  max (p (some false)) (p (some true))
-
 noncomputable def instanceBit (z : Instance) : Bool :=
   if (1 / 4 : ENNReal) ≤ boundedAnswer z.machineCode z.steps z.input none
     then z.fallback
@@ -155,12 +149,9 @@ noncomputable def language (w : Word) : Bool :=
   | none => false
   | some z => if z.Valid then instanceBit z else false
 
-/-- Agreement returns the common bit; disagreement gives up. -/
-def combine (b₀ b₁ : Bool) : Answer := if b₀ = b₁ then some b₀ else none
-
 theorem language_encode (z : Instance) (hz : z.Valid) :
     language (encode z) = instanceBit z := by
-  sorry
+  simp [language, decode_encode, hz]
 
 theorem exactLanguageBit_eq (z : Instance) :
     exactLanguageBit z.machineCode z.steps z.input z.fallback = instanceBit z := by
@@ -171,18 +162,11 @@ theorem query_answers_differ_iff (z : Instance) (hz : z.Valid) :
     language (encode { z with fallback := false }) ≠
       language (encode { z with fallback := true }) ↔
     (1 / 4 : ENNReal) ≤ boundedAnswer z.machineCode z.steps z.input none := by
-  sorry
-
-theorem frequentBit_eq_of_small_wrong_and_giveUp (p : PMF Answer) (b : Bool)
-    (hwrong : p (some (!b)) < (1 / 100 : ENNReal))
-    (hgiveUp : p none < (1 / 4 : ENNReal)) : frequentBit p = b := by
-  sorry
-
-theorem peak_gt_of_small_wrong_and_giveUp (p : PMF Answer) (b : Bool)
-    (hwrong : p (some (!b)) < (1 / 100 : ENNReal))
-    (hgiveUp : p none < (1 / 100 : ENNReal)) :
-    (98 / 100 : ENNReal) < peak p := by
-  sorry
+  rw [language_encode _ (show ({z with fallback := false}).Valid from hz),
+    language_encode _ (show ({z with fallback := true}).Valid from hz)]
+  by_cases h : (1 / 4 : ENNReal) ≤ boundedAnswer z.machineCode z.steps z.input none
+  · simpa only [instanceBit, h, if_pos] using (show (false ≠ true ↔ True) by simp)
+  · simp only [instanceBit, h, if_false, ne_eq, not_true_eq_false]
 
 /-! ## 3. Algorithm 3.1 and the mass estimates (Lemma 3.2) -/
 
@@ -346,7 +330,11 @@ theorem amplified_witness (P : DistributionalProblem) (hP : AvgBPP P) :
         wrongProb P.language x (A.run x k) < (1 / 100 : ENNReal)) ∧
       (∀ k n, P.distribution.prob n
         (fun x => (1 / 100 : ENNReal) ≤ A.run x k none) < k.bound) := by
-  sorry
+  obtain ⟨A, hA⟩ := hP
+  obtain ⟨depth, hboost⟩ := amplification_constant A P hA (1 / 100) (by norm_num)
+  refine ⟨A.amplify depth, ?_, ?_⟩
+  · simpa using hboost.correct
+  · simpa using hboost.useful
 
 /-- Compile an actual PPT algorithm and specialize its unary-accuracy input
 using a binary constant in the code (Remark 3.2). This requires a concrete
@@ -401,7 +389,11 @@ structure CompiledSource (P : DistributionalProblem) where
 semantics and uniform polynomial clocks. This includes Remark 3.2. -/
 theorem compile_source (P : DistributionalProblem)
     (hP : AvgBPP P) (hD : PSamp P.distribution) : Nonempty (CompiledSource P) := by
-  sorry
+  obtain ⟨A, hcorrect, huseful⟩ := amplified_witness P hP
+  obtain ⟨code, c, d, sizeCoefficient, hefficient, hsize, hexecution⟩ := compile_algorithm A
+  obtain ⟨samplerCode, sc, sd, hsampling⟩ := compile_sampler P.distribution hD
+  exact ⟨⟨A, code, c, d, samplerCode, sc, sd, sizeCoefficient,
+    hefficient, hsize, hexecution, hsampling, hcorrect, huseful⟩⟩
 
 namespace CompiledSource
 
@@ -418,19 +410,26 @@ def query (W : CompiledSource P) (x : Word) (k : Accuracy) (b : Bool) : Word :=
 
 theorem query_valid (W : CompiledSource P) (x : Word) (k : Accuracy) (b : Bool) :
     (W.queryInstance x k b).Valid := by
-  sorry
+  simp only [Instance.Valid, queryInstance]
+  omega
 
 theorem query_injective (W : CompiledSource P) (k : Accuracy) (b : Bool) :
     Function.Injective (fun x => W.query x k b) := by
-  sorry
+  intro x y h
+  have hi := encode_injective h
+  exact congrArg Instance.input hi
 
 theorem query_distinct (W : CompiledSource P) (x : Word) (k : Accuracy) :
     W.query x k false ≠ W.query x k true := by
-  sorry
+  intro h
+  have hi := encode_injective h
+  have := congrArg Instance.fallback hi
+  simp [queryInstance] at this
 
 theorem query_length_eq (W : CompiledSource P) (x : Word) (k : Accuracy) :
     (W.query x k false).length = (W.query x k true).length := by
-  sorry
+  exact encodeSeed_length_congr (W.queryInstance x k false).seed
+    (W.queryInstance x k true).seed rfl rfl rfl rfl rfl
 
 /-- Actual tidy-machine certification of constructing the query, not merely
 an upper bound on the resulting word's length. -/
@@ -466,27 +465,46 @@ theorem reduction_run (W : CompiledSource P) (L : Language) (x : Word) (k : Accu
 theorem reduction_asks_iff (W : CompiledSource P) (L : Language)
     (x : Word) (k : Accuracy) (y : Word) :
     W.reduction.Asks L x k y ↔ y = W.query x k false ∨ y = W.query x k true := by
-  sorry
+  simp [PolyTimeOracleScheme.Asks, PolyTimeOracleScheme.queryWords, W.reduction_trace]
 
 theorem reduction_giveUp_iff (W : CompiledSource P) (x : Word) (k : Accuracy) :
     W.reduction.run language x k = none ↔
       (1 / 4 : ENNReal) ≤ W.algorithm.run x k none := by
-  sorry
+  rw [W.reduction_run, combine_eq_none_iff]
+  have h := query_answers_differ_iff (W.queryInstance x k false) (W.query_valid x k false)
+  simpa only [query, queryInstance, W.execution] using h
 
 theorem reduction_correct (W : CompiledSource P) :
     (W.reduction.run language).Correct P := by
-  sorry
+  intro k x hx
+  by_cases hgiveUp : (1 / 4 : ENNReal) ≤ W.algorithm.run x k none
+  · exact Or.inr ((W.reduction_giveUp_iff x k).mpr hgiveUp)
+  · have hbit := frequentBit_eq_of_small_wrong_and_giveUp
+      (W.algorithm.run x k) (P.language x)
+      (by simpa only [wrongProb_eq_mass] using W.correct k x hx)
+      (lt_of_not_ge hgiveUp)
+    have hfalse : language (W.query x k false) = P.language x := by
+      rw [query, language_encode _ (W.query_valid x k false)]
+      simp only [instanceBit, queryInstance, W.execution, if_neg hgiveUp, hbit]
+    have htrue : language (W.query x k true) = P.language x := by
+      rw [query, language_encode _ (W.query_valid x k true)]
+      simp only [instanceBit, queryInstance, W.execution, if_neg hgiveUp, hbit]
+    exact Or.inl (by rw [W.reduction_run, hfalse, htrue, combine_self])
 
 theorem reduction_useful (W : CompiledSource P) :
     (W.reduction.run language).Useful P := by
-  sorry
+  intro k n
+  apply lt_of_le_of_lt (P.distribution.prob_mono_on_support n ?_) (W.useful k n)
+  intro x _ hx
+  exact (by norm_num : (1 / 100 : ENNReal) ≤ 1 / 4).trans
+    ((W.reduction_giveUp_iff x k).mp hx)
 
 def exceptional (W : CompiledSource P) (k : Accuracy) (n : ℕ) : Set (FixedWord n) :=
   {x | (1 / 100 : ENNReal) ≤ W.algorithm.run x.toWord k none}
 
 theorem exceptional_mass (W : CompiledSource P) (k : Accuracy) (n : ℕ) :
     eventProb (P.distribution n) (W.exceptional k n) < k.bound := by
-  sorry
+  exact W.useful k n
 
 /-- Uniform polynomial lower bound on each query's target mass, outside E.
 This combines the sampler lower bound, source correctness, and compact codes. -/
@@ -505,7 +523,7 @@ theorem reduction_domination (W : CompiledSource P) :
 
 theorem reduction_conditions (W : CompiledSource P) :
     ErrorlessReductionConditions W.reduction P problem := by
-  sorry
+  exact ⟨⟨W.reduction_correct, W.reduction_useful⟩, W.reduction_domination⟩
 
 /-- This is the support consequence available from the domination argument.
 There is intentionally no unconditional QueriesSupported assertion here. -/
@@ -523,12 +541,14 @@ end CompiledSource
 /-- Hardness part of Theorem 3.2, using the existing uniform-clock reduction API. -/
 theorem errorlesslyReducible (P : DistributionalProblem)
     (hP : AvgBPP P) (hD : PSamp P.distribution) : ErrorlesslyReducible P problem := by
-  sorry
+  obtain ⟨W⟩ := compile_source P hP hD
+  exact ⟨W.reduction, W.reduction_conditions⟩
 
 /-- Theorem 3.2: membership, samplability, and errorless completeness. -/
 theorem complete :
     WithPSamp AvgBPP problem ∧
       ∀ P : DistributionalProblem, WithPSamp AvgBPP P → ErrorlesslyReducible P problem := by
-  sorry
+  exact ⟨⟨problem_avgBPP, distribution_psamp⟩,
+    fun P hP => errorlesslyReducible P hP.1 hP.2⟩
 
 end AverageCaseComplexity.Completeness.TwoQuery

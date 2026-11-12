@@ -1,10 +1,15 @@
 # Two-query completeness: proof skeleton
 
-`AverageCaseComplexity/Completeness/TwoQuery.lean` outlines Itsykson §3,
-Theorems 3.1–3.2 and their prerequisites. **It is not proved:** every theorem
-has a `sorry` body, and unimplemented executable constructions also have
-explicit placeholders. Successful elaboration checks statements and interfaces,
-not the truth of these results.
+`AverageCaseComplexity/Completeness/TwoQuery.lean` develops Itsykson §3,
+Theorems 3.1–3.2 and their prerequisites. **Completeness is not yet proved:**
+major executable constructions and foundational theorems still have explicit
+`sorry` placeholders. The final assembly has a proof body, but its dependencies
+still include `sorryAx`; successful elaboration is not a completeness certificate.
+
+`Completeness/AnswerLaw.lean` is a separate, placeholder-free module proving the
+three-answer probability facts and agreement/give-up identities. The amplification
+bridge and several conditional reduction proofs are also implemented in
+`TwoQuery.lean`; they do not eliminate the outstanding construction obligations.
 
 ## Dependency map
 
@@ -12,7 +17,7 @@ not the truth of these results.
 | --- | --- | --- |
 | Machine representation | `boundedAnswer`, `boundedSample`, `exactLanguageBit`, `compile_algorithm`, `compile_sampler` | Binary codes for actual finite-control fair-coin machines; bounded universal interpretation; exhaustive coin enumeration; strict polynomial simulation overhead; exact correspondence with existing PPT certificates |
 | Tuple representation | `Instance`, `Seed`, `encodeSeed`, `decodeSeed`, `encode`, `decode` | Self-delimiting binary encoding, round trips, length invariance, logarithmic overhead, payload lower bound, and all-ones rejection |
-| Complete language | `language`, `instanceBit`, `query_answers_differ_iff` | Threshold truth table and elementary PMF inequalities relating wrong/give-up probabilities to the most frequent Boolean answer |
+| Complete language | `language`, `instanceBit`, `query_answers_differ_iff` | Truth table and elementary PMF inequalities proved; executable bounded evaluation remains outstanding |
 | Algorithm 3.1 | `reliabilityTest`, `sampler`, `samplerLaw`, `distribution` | Executable independent trials, Chernoff bounds, exact sampler law, fixed output length, and strict PPT certificate |
 | Lemma 3.2 | `seed_fiber_mass_lower`, `distribution_mass_lower`, `distribution_mass_upper` | Count the whole seed fiber; combine it with exact bounded sampling and filter acceptance; account for every preimage in the upper bound |
 | Lemma 3.1 | `targetProgram`, `targetProgram_correct`, `bad_instances_mass`, `targetProgram_useful`, `avgBPP_of_small_bad_mass` | 80%-majority solver, exhaustive branch when `k ≥ 2^m`, polynomial runtime in unary accuracy, and nested usefulness |
@@ -20,7 +25,7 @@ not the truth of these results.
 | Source preparation | `amplified_witness`, `CompiledSource`, `compile_source` | Amplify internal error/give-up thresholds to 0.01; specialize accuracy using compact binary code; compile the exact source sampler |
 | Two-query machine | `query_efficient`, `reduction`, `reduction_trace`, `reduction_run` | Certify actual query construction and a uniformly halting finite-control machine; exactly two nonadaptive calls; agree-or-give-up reply processing |
 | Reduction conditions | `reduction_correct`, `reduction_useful`, `exceptional_mass`, `query_mass_lower`, `reduction_domination`, `reduction_conditions` | Pointwise correctness on source support, exceptional-set bound, polynomial mass ratio, and collision-free query fibers |
-| Theorem 3.2 | `errorlesslyReducible`, `complete` | Assemble errorless hardness and target membership |
+| Theorem 3.2 | `errorlesslyReducible`, `complete` | Assembly implemented, but still depends on unproved prerequisites |
 
 The intended first implementation step is the binary tuple/machine-code layer.
 The source compilation bridge is substantial: machine codes cannot be arbitrary
