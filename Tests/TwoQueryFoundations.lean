@@ -2,10 +2,16 @@ import AverageCaseComplexity.Completeness.VoteRuntime
 import AverageCaseComplexity.Completeness.LengthNormalization
 import AverageCaseComplexity.Completeness.SeedMass
 import AverageCaseComplexity.Completeness.CompactCode
+import AverageCaseComplexity.Completeness.FairReplay
 import Lean
 
 open AverageCaseComplexity AverageCaseComplexity.Completeness.TwoQuery
 open Cslib Cslib.Probability Turing.MultiTapeTM
+
+-- One of four tapes gives up: use the fallback even on exact equality.
+example : exactReplayBit (fun w => if w = [true, true] then none else some false) 2 true = true := by decide
+-- No give-ups and equal Boolean counts: the frequent-bit tie goes to false.
+example : exactReplayBit (fun w => w.head?) 1 true = false := by decide
 
 example : reliabilityVote [] = true := rfl
 example : reliabilityVote [some false, some true] = false := rfl
@@ -76,6 +82,7 @@ run_cmd do
       ``fixedLengthLaw_map_toWord, ``selfDelimitingCode_efficient, ``encodeSeed_efficient_with,
       ``decodeSpecializedCode_specializeCode, ``decodeSpecializedCode_sound,
       ``specializeCode_size, ``specializeCode_efficient,
+      ``eval_fairTape, ``fairTape_efficient, ``exactReplayBit_eq, ``replay_mass,
       ``answerCount_upper_tail, ``answerCount_lower_tail,
       ``reliabilityLaw_accept_upper_all, ``reliabilityLaw_accept_lower,
       ``majorityLaw_wrong_lt_quarter, ``majorityLaw_giveUp,
