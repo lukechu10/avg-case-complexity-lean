@@ -13,3 +13,4 @@ import AverageCaseComplexity.Reductions.TwoQueryMachine
 import AverageCaseComplexity.Reductions.StateReindex
 -- In-progress §3 development: final completeness still depends on `sorry` prerequisites.
 import AverageCaseComplexity.Completeness.TwoQuery
+import AverageCaseComplexity.Completeness.SourceClock
