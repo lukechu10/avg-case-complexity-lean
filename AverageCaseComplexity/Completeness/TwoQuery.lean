@@ -8,6 +8,8 @@ public import AverageCaseComplexity.Completeness.CompactCode
 public import AverageCaseComplexity.Completeness.VoteRuntime
 public import AverageCaseComplexity.Completeness.SeedMass
 public import AverageCaseComplexity.Reductions.Closure
+public import AverageCaseComplexity.Reductions.TwoQueryMachine
+public import AverageCaseComplexity.Reductions.StateReindex
 public import Mathlib.Analysis.SpecialFunctions.Exp
 
 @[expose] public section
@@ -535,21 +537,78 @@ theorem seedDenominator_polynomial (W : CompiledSource P) :
 
 /-! ## 6. Certified truth-table reduction and its distributional conditions -/
 
+/-- Internal packaged witness: retain the exact execution theorem alongside the
+finite-control machine so the reduction's trace and output use that same machine. -/
+structure ReductionData (W : CompiledSource P) where
+  workTapes : ℕ
+  stateCount : ℕ
+  machine : OracleMachine workTapes stateCount
+  coefficient : ℕ
+  degree : ℕ
+  run_exact : ∀ (a : Word × Accuracy) (L : Language),
+    _root_.AverageCaseComplexity.OracleMachine.run machine L
+      (coefficient * ((schemeInputEncoding a).length + 1) ^ degree)
+      (schemeInputEncoding a) =
+        (_root_.AverageCaseComplexity.OracleMachine.wordConfig (schemeInputEncoding a) none [] [L (W.query a.1 a.2 true)]
+          (answerEncoding (combine (L (W.query a.1 a.2 false))
+            (L (W.query a.1 a.2 true)))),
+          [(W.query a.1 a.2 false, L (W.query a.1 a.2 false)),
+           (W.query a.1 a.2 true, L (W.query a.1 a.2 true))])
+
+noncomputable def reductionData (W : CompiledSource P) : ReductionData W := by
+  classical
+  choose tapes State hfinite M c d hrun using
+    (_root_.AverageCaseComplexity.OracleMachine.exists_twoQuery_machine schemeInputEncoding
+      (fun a : Word × Accuracy => W.query a.1 a.2 false)
+      (fun a : Word × Accuracy => W.query a.1 a.2 true)
+      (W.query_efficient false) (W.query_efficient true))
+  letI : Finite State := hfinite
+  letI : Fintype State := Fintype.ofFinite State
+  let e : State ≃ Fin (Fintype.card State) := Fintype.equivFin State
+  refine ⟨tapes, Fintype.card State, _root_.AverageCaseComplexity.OracleMachine.reindex M e, c, d, ?_⟩
+  intro a L
+  rw [_root_.AverageCaseComplexity.OracleMachine.run_reindex]
+  rw [hrun a L]
+  rfl
+
 /-- Must be a real finite-control machine with a uniform clock for every oracle.
 Its construction composes query generation, two oracle calls, and combine. -/
 noncomputable def reduction (W : CompiledSource P) : PolyTimeOracleScheme := by
-  sorry
+  let D := reductionData W
+  refine ⟨D.workTapes, D.stateCount, D.machine, D.coefficient, D.degree, ?_, ?_⟩
+  · intro L a
+    change (OracleMachine.run D.machine L
+      (D.coefficient * ((schemeInputEncoding a).length + 1) ^ D.degree)
+      (schemeInputEncoding a)).1.tapes.state = none
+    rw [D.run_exact]
+    rfl
+  · intro L a
+    refine ⟨combine (L (W.query a.1 a.2 false)) (L (W.query a.1 a.2 true)), ?_⟩
+    change (OracleMachine.run D.machine L
+      (D.coefficient * ((schemeInputEncoding a).length + 1) ^ D.degree)
+      (schemeInputEncoding a)).1.tapes.output = _
+    rw [D.run_exact]
+    rfl
 
 /-- Exact trace proves nonadaptivity, not just a bound of two on query count. -/
 theorem reduction_trace (W : CompiledSource P) (L : Language) (x : Word) (k : Accuracy) :
     W.reduction.trace L x k =
       [(W.query x k false, L (W.query x k false)),
        (W.query x k true, L (W.query x k true))] := by
-  sorry
+  change (_root_.AverageCaseComplexity.OracleMachine.run (reductionData W).machine L
+    ((reductionData W).coefficient * ((schemeInputEncoding (x, k)).length + 1) ^
+      (reductionData W).degree)
+    (schemeInputEncoding (x, k))).2 = _
+  rw [(reductionData W).run_exact (x, k) L]
 
 theorem reduction_run (W : CompiledSource P) (L : Language) (x : Word) (k : Accuracy) :
     W.reduction.run L x k = combine (L (W.query x k false)) (L (W.query x k true)) := by
-  sorry
+  change decodeOracleAnswer (_root_.AverageCaseComplexity.OracleMachine.run (reductionData W).machine L
+    ((reductionData W).coefficient * ((schemeInputEncoding (x, k)).length + 1) ^
+      (reductionData W).degree)
+    (schemeInputEncoding (x, k))).1.tapes.output = _
+  rw [(reductionData W).run_exact (x, k) L]
+  simp [OracleMachine.wordConfig]
 
 theorem reduction_asks_iff (W : CompiledSource P) (L : Language)
     (x : Word) (k : Accuracy) (y : Word) :
