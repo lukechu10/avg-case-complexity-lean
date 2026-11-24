@@ -267,11 +267,11 @@ theorem distribution_mass_lower (z : Instance) (hz : z.Valid)
     _ ≤ eventProb (uniformEnsemble n) E * A := by gcongr
     _ ≤ _ := eventProb_mul_le_bind_apply (uniformEnsemble n) Q (encode z) E A hQ
 
-/-- Lemma 3.2(2); includes all preimages, not just canonical seeds. -/
 private theorem mass_select (p : PMF Bool) (hit miss y : Word) (hmiss : y ≠ miss) :
     (p.map (fun b => if b then hit else miss)) y = if y = hit then p true else 0 := by
   simp [PMF.map_apply, tsum_fintype, Fintype.sum_bool, hmiss]
 
+/-- Lemma 3.2(2); includes all preimages, not just canonical seeds. -/
 theorem distribution_mass_upper (z : Instance) (_hz : z.Valid)
     (hbad : peak (boundedAnswer z.machineCode z.steps z.input) ≤ (85 / 100 : ENNReal)) :
     distribution.wordMass (encode z) ≤ tailBound (encode z).length := by
@@ -337,13 +337,26 @@ def targetProgram (a : Word × Accuracy) : Cslib.ProbComp Answer := do
   | none => pure (some false)
   | some z =>
     if z.input.length + burnIn < z.steps then
-      if 2 ^ z.steps ≤ a.2.val then
+      if z.steps < a.2.val.size then
         pure (some (exactLanguageBit z.machineCode z.steps z.input z.fallback))
       else
         majorityProgram (boundedAnswerProgram z.machineCode z.steps z.input)
           (200 * z.steps ^ 2)
     else
       pure (some false)
+
+/-- The exact-branch test only compares the simulated clock with the length of
+`k` in binary. Its machine need not produce the exponentially long unary `2^m`. -/
+theorem exactBranchTest_efficient {α : Type} {input : α ↪ Word} {steps k : α → ℕ}
+    (hm : Turing.MultiTapeTM.ComputableTidilyInPolyTime steps input Turing.MultiTapeTM.encUnary)
+    (hk : Turing.MultiTapeTM.ComputableTidilyInPolyTime k input Turing.MultiTapeTM.encUnary) :
+    Turing.MultiTapeTM.ComputableTidilyInPolyTime (fun a => decide (steps a < (k a).size))
+      input Turing.MultiTapeTM.encBool := by
+  open Turing.MultiTapeTM in
+    have hbits : ComputableTidilyInPolyTime (fun a => (k a).bits) input encBits :=
+      (ComputableTidilyInPolyTime.unary_to_binary.comp hk).of_enc_eq (fun a => by simp [encNat_apply])
+    simpa only [Function.comp_apply, Nat.size_eq_bits_len] using ComputableTidilyInPolyTime.unary_lt' hm
+      (ComputableTidilyInPolyTime.length_bits.comp hbits)
 
 theorem targetProgram_efficient :
     Cslib.Probability.IsPPTOn schemeInputEncoding answerEncoding targetProgram := by
@@ -371,7 +384,7 @@ theorem targetProgram_correct (H : Ensemble) :
       by_cases hz : z.Valid
       · change z.input.length + burnIn < z.steps at hz
         rw [language_encode z (by exact hz)]
-        by_cases he : 2 ^ z.steps ≤ k.val
+        by_cases he : z.steps < k.val.size
         · simp [targetProgram, decode_encode, hz, he, exactLanguageBit_eq]
         · have hev : Cslib.ProbComp.eval (targetProgram (encode z, k)) =
               majorityLaw (boundedAnswer z.machineCode z.steps z.input) (200 * z.steps ^ 2) := by
@@ -405,7 +418,7 @@ theorem targetProgram_giveUp_bad (k : Accuracy) (x : Word)
       rw [← hx] at hgive
       by_cases hz : z.Valid
       · change z.input.length + burnIn < z.steps at hz
-        by_cases he : 2 ^ z.steps ≤ k.val
+        by_cases he : z.steps < k.val.size
         · simp [targetProgram, decode_encode, hz, he] at hgive
         · have hev : Cslib.ProbComp.eval (targetProgram (encode z, k)) none =
               majorityLaw (boundedAnswer z.machineCode z.steps z.input)
@@ -415,7 +428,7 @@ theorem targetProgram_giveUp_bad (k : Accuracy) (x : Word)
           rw [hev] at hgive
           by_cases hpeak : peak (boundedAnswer z.machineCode z.steps z.input) ≤
               (85 / 100 : ENNReal)
-          · exact ⟨z, hx, hz, hpeak, lt_of_not_ge he⟩
+          · exact ⟨z, hx, hz, hpeak, lt_of_not_ge (he ∘ Nat.lt_size.mpr)⟩
           · have hgood : (85 / 100 : ENNReal) ≤
                 peak (boundedAnswer z.machineCode z.steps z.input) := le_of_not_ge hpeak
             have hlarge : 2 ≤ z.steps := by
