@@ -1,5 +1,7 @@
 module
 
+public import AverageCaseComplexity.Completeness.BoundedMachine
+public import AverageCaseComplexity.Completeness.FairReplay
 public import AverageCaseComplexity.Completeness.TailBounds
 public import AverageCaseComplexity.Completeness.ThresholdBounds
 public import AverageCaseComplexity.Completeness.TupleEncoding
@@ -44,20 +46,26 @@ namespace AverageCaseComplexity.Completeness.TwoQuery
 
 /-! ## 1. Machine codes, bounded execution, and tuple encoding -/
 
-/-- Must be implemented by decoding and running an actual fair-coin machine.
-Invalid codes have a fixed give-up interpretation. -/
-noncomputable def boundedAnswer (code : Word) (steps : ℕ) (x : Word) : PMF Answer := by
-  sorry
+/-- Execute a bounded fair-coin machine on one fresh tape of `steps` bits. -/
+def boundedAnswerProgram (code : Word) (steps : ℕ) (x : Word) : Cslib.ProbComp Answer :=
+  replayAnswer code x <$> fairTape steps
 
-/-- Bounded sampler semantics, truncating/padding the output to exactly n bits.
-The same normalization must be used in the executable universal simulator. -/
-noncomputable def boundedSample (code : Word) (steps n : ℕ) : PMF (FixedWord n) := by
-  sorry
+noncomputable def boundedAnswer (code : Word) (steps : ℕ) (x : Word) : PMF Answer :=
+  Cslib.ProbComp.eval (boundedAnswerProgram code steps x)
 
-/-- This branch will compute C's bit, not merely one sample of boundedAnswer.
-The concrete implementation enumerates at most 2^steps coin strings. -/
-def exactLanguageBit (code : Word) (steps : ℕ) (x : Word) (fallback : Bool) : Bool := by
-  sorry
+theorem boundedAnswerProgram_eval (code : Word) (steps : ℕ) (x : Word) :
+    Cslib.ProbComp.eval (boundedAnswerProgram code steps x) = boundedAnswer code steps x := rfl
+
+/-- Bounded sampler execution, truncating/padding the output to exactly n bits. -/
+def boundedSampleProgram (code : Word) (steps n : ℕ) : Cslib.ProbComp (FixedWord n) :=
+  replaySample code n <$> fairTape steps
+
+noncomputable def boundedSample (code : Word) (steps n : ℕ) : PMF (FixedWord n) :=
+  Cslib.ProbComp.eval (boundedSampleProgram code steps n)
+
+/-- Compute C's bit by counting the answers on all length-`steps` coin tapes. -/
+def exactLanguageBit (code : Word) (steps : ℕ) (x : Word) (fallback : Bool) : Bool :=
+  exactReplayBit (replayAnswer code x) steps fallback
 
 def Instance.Valid (z : Instance) : Prop := z.input.length + burnIn < z.steps
 
@@ -80,8 +88,8 @@ theorem language_encode (z : Instance) (hz : z.Valid) :
   simp [language, decode_encode, hz]
 
 theorem exactLanguageBit_eq (z : Instance) :
-    exactLanguageBit z.machineCode z.steps z.input z.fallback = instanceBit z := by
-  sorry
+    exactLanguageBit z.machineCode z.steps z.input z.fallback = instanceBit z :=
+  exactReplayBit_eq _ _ _
 
 /-- The only difference between the two instances is the fallback bit. -/
 theorem query_answers_differ_iff (z : Instance) (hz : z.Valid) :
@@ -99,24 +107,35 @@ theorem query_answers_differ_iff (z : Instance) (hz : z.Valid) :
 /-- Sample the bounded computation independently 200*N^2 times; accept iff
 one Boolean answer occupies at least 90% of the samples. -/
 def reliabilityTest (code : Word) (steps : ℕ) (x : Word) (N : ℕ) :
-    Cslib.ProbComp Bool := by
-  sorry
+    Cslib.ProbComp Bool :=
+  reliabilityProgram (boundedAnswerProgram code steps x) (200 * N ^ 2)
 
 theorem reliabilityTest_accept_lower (code : Word) (steps : ℕ) (x : Word) (N : ℕ)
     (hN : 0 < N)
     (hgood : (95 / 100 : ENNReal) ≤ peak (boundedAnswer code steps x)) :
     1 - tailBound N ≤ Cslib.ProbComp.eval (reliabilityTest code steps x N) true := by
-  sorry
+  rw [reliabilityTest, reliabilityProgram_eval, boundedAnswerProgram_eval]
+  exact reliabilityLaw_accept_lower (boundedAnswer code steps x) N hN hgood
 
 theorem reliabilityTest_accept_upper (code : Word) (steps : ℕ) (x : Word) (N : ℕ)
     (hbad : peak (boundedAnswer code steps x) ≤ (85 / 100 : ENNReal)) :
     Cslib.ProbComp.eval (reliabilityTest code steps x N) true ≤ tailBound N := by
-  sorry
+  rw [reliabilityTest, reliabilityProgram_eval, boundedAnswerProgram_eval]
+  exact reliabilityLaw_accept_upper_all (boundedAnswer code steps x) N hbad
 
 /-- Algorithm 3.1: uniform seed, bounded normalized sampling, reliability filter,
 canonical tuple on success, all-ones on failure; unparseable seeds are unchanged. -/
-def sampler (n : ℕ) : Cslib.ProbComp Word := by
-  sorry
+def sampler (n : ℕ) : Cslib.ProbComp Word := do
+  let w ← fairTape n
+  match decodeSeed w with
+  | none => pure w
+  | some z => do
+      let x ← boundedSampleProgram z.samplerCode z.samplerClockBits.length z.input.length
+      let accept ← reliabilityTest z.machineCode z.clockBits.length x.toWord n
+      pure <| if accept then
+        encode ⟨z.machineCode, x.toWord, z.clockBits.length,
+          z.fallback, z.samplerCode, z.samplerClockBits.length⟩
+        else List.replicate n true
 
 /-- The semantic step-by-step specification must be proved for the implementation. -/
 noncomputable def samplerLaw (n : ℕ) : PMF Word :=
@@ -131,7 +150,17 @@ noncomputable def samplerLaw (n : ℕ) : PMF Word :=
             else List.replicate n true
 
 theorem sampler_eval (n : ℕ) : Cslib.ProbComp.eval (sampler n) = samplerLaw n := by
-  sorry
+  have hu : Cslib.BitString.uniformList n = uniformEnsemble.wordDistribution n := by
+    unfold Cslib.BitString.uniformList Ensemble.wordDistribution
+    congr 1
+    ext a
+    simp
+  rw [sampler, Cslib.ProbComp.eval_bind, eval_fairTape, hu, samplerLaw]
+  congr 1
+  funext w
+  cases hd : decodeSeed w with
+  | none => rfl
+  | some z => simp [Cslib.ProbComp.eval_bind, boundedSample]
 
 theorem sampler_output_length (n : ℕ) (w : Word)
     (hw : Cslib.ProbComp.eval (sampler n) w ≠ 0) : w.length = n := by
@@ -239,6 +268,10 @@ theorem distribution_mass_lower (z : Instance) (hz : z.Valid)
     _ ≤ _ := eventProb_mul_le_bind_apply (uniformEnsemble n) Q (encode z) E A hQ
 
 /-- Lemma 3.2(2); includes all preimages, not just canonical seeds. -/
+private theorem mass_select (p : PMF Bool) (hit miss y : Word) (hmiss : y ≠ miss) :
+    (p.map (fun b => if b then hit else miss)) y = if y = hit then p true else 0 := by
+  simp [PMF.map_apply, tsum_fintype, Fintype.sum_bool, hmiss]
+
 theorem distribution_mass_upper (z : Instance) (_hz : z.Valid)
     (hbad : peak (boundedAnswer z.machineCode z.steps z.input) ≤ (85 / 100 : ENNReal)) :
     distribution.wordMass (encode z) ≤ tailBound (encode z).length := by
@@ -266,8 +299,7 @@ theorem distribution_mass_upper (z : Instance) (_hz : z.Valid)
       intro x
       let v : Instance := ⟨u.machineCode, x.toWord, u.clockBits.length,
         u.fallback, u.samplerCode, u.samplerClockBits.length⟩
-      change ((Cslib.ProbComp.eval (reliabilityTest u.machineCode u.clockBits.length x.toWord n)).map
-        (fun accept => if accept then encode v else List.replicate n true)) (encode z) ≤ tailBound n
+      rw [mass_select _ _ _ _ hones]
       by_cases hv : encode v = encode z
       · have hi := encode_injective hv
         have hM := congrArg Instance.machineCode hi
@@ -276,9 +308,14 @@ theorem distribution_mass_upper (z : Instance) (_hz : z.Valid)
         dsimp only [v] at hM ht hx
         have hprogram : reliabilityTest u.machineCode u.clockBits.length x.toWord n =
             reliabilityTest z.machineCode z.steps z.input n := by rw [hM, ht, hx]
-        simpa [PMF.map_apply, tsum_fintype, Fintype.sum_bool, hv, hones, hprogram] using
-          reliabilityTest_accept_upper z.machineCode z.steps z.input n hbad
-      · simp [PMF.map_apply, tsum_fintype, Ne.symm hv, hones]
+        dsimp only [v] at hv
+        rw [if_pos hv.symm]
+        dsimp only [n] at hprogram
+        rw [hprogram]
+        exact reliabilityTest_accept_upper _ _ _ _ hbad
+      · dsimp only [v] at hv
+        rw [if_neg (Ne.symm hv)]
+        exact bot_le
 
 /-- Valid tuples are large enough that the accepted fraction is uniformly
 bounded away from zero; this constant is absorbed by domination. -/
@@ -295,8 +332,18 @@ theorem accepted_fraction_lower (z : Instance) (hz : z.Valid) :
 /-- Execute 200*m^2 independent trials, returning an 80%-majority Boolean
 answer or giving up; enumerate all coin strings instead when k >= 2^m.
 Malformed/invalid tuples return false deterministically. -/
-def targetProgram (a : Word × Accuracy) : Cslib.ProbComp Answer := by
-  sorry
+def targetProgram (a : Word × Accuracy) : Cslib.ProbComp Answer := do
+  match decode a.1 with
+  | none => pure (some false)
+  | some z =>
+    if z.input.length + burnIn < z.steps then
+      if 2 ^ z.steps ≤ a.2.val then
+        pure (some (exactLanguageBit z.machineCode z.steps z.input z.fallback))
+      else
+        majorityProgram (boundedAnswerProgram z.machineCode z.steps z.input)
+          (200 * z.steps ^ 2)
+    else
+      pure (some false)
 
 theorem targetProgram_efficient :
     Cslib.Probability.IsPPTOn schemeInputEncoding answerEncoding targetProgram := by
@@ -312,7 +359,79 @@ theorem exact_branch_budget (m : ℕ) (k : Accuracy) (h : 2 ^ m ≤ k.val) :
 theorem targetProgram_correct (H : Ensemble) :
     RandomizedScheme.Correct
       (fun x k => Cslib.ProbComp.eval (targetProgram (x, k))) ⟨language, H⟩ := by
-  sorry
+  intro k x _
+  change wrongProb language x (Cslib.ProbComp.eval (targetProgram (x, k))) < (1 / 4 : ENNReal)
+  rw [wrongProb_eq_mass]
+  cases hd : decode x with
+  | none =>
+      simp [targetProgram, hd, language, PMF.pure_apply]
+  | some z =>
+      have hx : encode z = x := decode_sound x z hd
+      rw [← hx]
+      by_cases hz : z.Valid
+      · change z.input.length + burnIn < z.steps at hz
+        rw [language_encode z (by exact hz)]
+        by_cases he : 2 ^ z.steps ≤ k.val
+        · simp [targetProgram, decode_encode, hz, he, exactLanguageBit_eq]
+        · have hev : Cslib.ProbComp.eval (targetProgram (encode z, k)) =
+              majorityLaw (boundedAnswer z.machineCode z.steps z.input) (200 * z.steps ^ 2) := by
+            simp [targetProgram, decode_encode, hz, he, majorityProgram_eval,
+              boundedAnswerProgram_eval]
+          rw [hev]
+          change majorityLaw (boundedAnswer z.machineCode z.steps z.input)
+            (200 * z.steps ^ 2) (some (!instanceBit z)) < (1 / 4 : ENNReal)
+          simpa [instanceBit, fallbackBit] using
+            majorityLaw_wrong_lt_quarter (boundedAnswer z.machineCode z.steps z.input)
+              z.fallback z.steps (by
+                have hv := hz
+                simp only [Instance.Valid, burnIn] at hv
+                omega)
+      · change ¬ z.input.length + burnIn < z.steps at hz
+        simp [targetProgram, decode_encode, language, Instance.Valid, hz]
+
+/-- A large conditional give-up probability can only occur on a low-peak
+instance and only in the sampling branch. -/
+theorem targetProgram_giveUp_bad (k : Accuracy) (x : Word)
+    (hgive : (1 / 4 : ENNReal) ≤
+      Cslib.ProbComp.eval (targetProgram (x, k)) none) :
+    ∃ z, encode z = x ∧ z.Valid ∧
+      peak (boundedAnswer z.machineCode z.steps z.input) ≤ (85 / 100 : ENNReal) ∧
+      k.val < 2 ^ z.steps := by
+  cases hd : decode x with
+  | none =>
+      simp [targetProgram, hd] at hgive
+  | some z =>
+      have hx : encode z = x := decode_sound x z hd
+      rw [← hx] at hgive
+      by_cases hz : z.Valid
+      · change z.input.length + burnIn < z.steps at hz
+        by_cases he : 2 ^ z.steps ≤ k.val
+        · simp [targetProgram, decode_encode, hz, he] at hgive
+        · have hev : Cslib.ProbComp.eval (targetProgram (encode z, k)) none =
+              majorityLaw (boundedAnswer z.machineCode z.steps z.input)
+                (200 * z.steps ^ 2) none := by
+            simp [targetProgram, decode_encode, hz, he, majorityProgram_eval,
+              boundedAnswerProgram_eval]
+          rw [hev] at hgive
+          by_cases hpeak : peak (boundedAnswer z.machineCode z.steps z.input) ≤
+              (85 / 100 : ENNReal)
+          · exact ⟨z, hx, hz, hpeak, lt_of_not_ge he⟩
+          · have hgood : (85 / 100 : ENNReal) ≤
+                peak (boundedAnswer z.machineCode z.steps z.input) := le_of_not_ge hpeak
+            have hlarge : 2 ≤ z.steps := by
+              simp only [Instance.Valid, burnIn] at hz
+              omega
+            have hN : 0 < 200 * z.steps ^ 2 := by positivity
+            have htail := majorityLaw_giveUp (boundedAnswer z.machineCode z.steps z.input)
+              (200 * z.steps ^ 2) hN hgood
+            have hsmall : ENNReal.ofReal (Real.exp (-((z.steps : ℝ) ^ 2))) <
+                (1 / 4 : ENNReal) := single_tail_lt_quarter hlarge
+            have hscale : -( ((200 * z.steps ^ 2 : ℕ) : ℝ)) / 200 =
+                -((z.steps : ℝ) ^ 2) := by push_cast; ring
+            rw [hscale] at htail
+            exact False.elim (not_le_of_gt (lt_of_le_of_lt htail hsmall) hgive)
+      · change ¬ z.input.length + burnIn < z.steps at hz
+        simp [targetProgram, decode_encode, language, Instance.Valid, hz] at hgive
 
 /-- Sum the pointwise small masses over at most 2^n bad instances. -/
 theorem bad_instances_mass (H : Ensemble)
@@ -343,7 +462,66 @@ theorem targetProgram_useful (H : Ensemble)
       H.wordMass (encode z) ≤ tailBound (encode z).length) :
     RandomizedScheme.Useful
       (fun x k => Cslib.ProbComp.eval (targetProgram (x, k))) ⟨language, H⟩ := by
-  sorry
+  intro k n
+  let E : Word → Prop := fun x =>
+    (1 / 4 : ENNReal) ≤ Cslib.ProbComp.eval (targetProgram (x, k)) none
+  let B : Word → Prop := fun x => ∃ z, encode z = x ∧ z.Valid ∧
+    peak (boundedAnswer z.machineCode z.steps z.input) ≤ (85 / 100 : ENNReal)
+  have hsub : H.prob n E ≤ H.prob n B :=
+    H.prob_mono_on_length n (fun x _ hs he => by
+      obtain ⟨z, henc, hz, hpeak, _⟩ := targetProgram_giveUp_bad k x he
+      exact ⟨z, henc, hz, hpeak⟩)
+  have hbad := bad_instances_mass H hH n
+  by_cases hk : k.val < 2 ^ n
+  · by_cases hn : 3 ≤ n
+    · calc
+        H.prob n E ≤ H.prob n B := hsub
+        _ ≤ (2 ^ n : ENNReal) * tailBound n := hbad
+        _ < (k.val : ENNReal)⁻¹ := by
+          calc
+            _ < (2 ^ n : ENNReal)⁻¹ := binary_union_tail_lt hn
+            _ ≤ (k.val : ENNReal)⁻¹ := by
+              apply ENNReal.inv_le_inv.mpr
+              exact_mod_cast hk.le
+        _ = k.bound := by simp [Accuracy.bound]
+    · have hzero : H.prob n E = 0 := by
+        apply le_antisymm
+        · have hle : H.prob n E ≤ H.prob n (fun _ : Word => False) :=
+            H.prob_mono_on_length n (E := E) (F := fun _ : Word => False)
+              (fun x hxlen hs he => False.elim (by
+            obtain ⟨z, henc, hz, _, _⟩ := targetProgram_giveUp_bad k x he
+            have hstep : z.steps ≤ n := by
+              calc
+                z.steps ≤ (encode z).length := by
+                  have hp := payload_length_le_encode_length z
+                  omega
+                _ = n := by rw [henc]; exact hxlen
+            have hv := hz
+            simp only [Instance.Valid, burnIn] at hv
+            omega))
+          simpa [E, Ensemble.prob] using hle
+        · exact bot_le
+      rw [hzero]
+      exact Accuracy.bound_pos k
+  · have hzero : H.prob n E = 0 := by
+      apply le_antisymm
+      · have hle : H.prob n E ≤ H.prob n (fun _ : Word => False) :=
+          H.prob_mono_on_length n (E := E) (F := fun _ : Word => False)
+            (fun x hxlen hs he => False.elim (by
+          obtain ⟨z, henc, _, _, hclock⟩ := targetProgram_giveUp_bad k x he
+          have hstep : z.steps ≤ n := by
+            calc
+              z.steps ≤ (encode z).length := by
+                have hp := payload_length_le_encode_length z
+                omega
+              _ = n := by rw [henc]; exact hxlen
+          have hp : 2 ^ z.steps ≤ 2 ^ n := by gcongr
+          have hk' : 2 ^ n ≤ k.val := Nat.le_of_not_gt hk
+          omega))
+        simpa [E, Ensemble.prob] using hle
+      · exact bot_le
+    rw [hzero]
+    exact Accuracy.bound_pos k
 
 /-- Lemma 3.1. -/
 theorem avgBPP_of_small_bad_mass (H : Ensemble)
