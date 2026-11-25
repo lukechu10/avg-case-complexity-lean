@@ -2,6 +2,8 @@
 
 `AverageCaseComplexity.Completeness.TwoQuery.complete` formalizes Itsykson §3, Theorems 3.1–3.2. The constructed problem belongs to `WithPSamp AvgBPP`, and every member of that class has an errorless reduction to it using two nonadaptive queries.
 
+For a guided derivation of the construction, its probability bounds, and its machine certificates, read [How the Lean proof of AvgBPP completeness works](avgbpp-completeness-walkthrough.md).
+
 ## Proof map
 
 - **Complete language:** `TupleEncoding` represents an instance with logarithmic overhead. `BoundedMachine` parses finite transition tables and replays one step per supplied coin. `FairReplay` proves that exhaustive integer counting on finite tapes gives exactly the PMF decision, including the one-quarter boundary and Boolean tie. `AnswerLaw` gives the pointwise wrong-answer bound.
