@@ -38,10 +38,10 @@ support issue in the paper's stated errorless argument. Fixed-budget closure
 
 Section 3's [two-query completeness development](docs/two-query-completeness.md)
 (`AverageCaseComplexity/Completeness/TwoQuery.lean`) now has a checked binary
-codec, probability bounds, certified repetition/voting, and conditional reduction
-proofs. Universal execution, compact compilation, and other construction
-prerequisites still contain `sorry`: the final `complete` theorem is **not yet
-certified**, despite having its assembly proof filled in.
+codec, bounded universal execution, compact source compilation, sampler mass
+bounds, target correctness/usefulness, and a finite-control two-query reduction.
+The `complete` theorem is **not yet certified**: the strict polynomial-time
+proofs for the sampler and target solver remain.
 
 Additional checks:
 
