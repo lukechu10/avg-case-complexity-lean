@@ -2,6 +2,8 @@ import AverageCaseComplexity.Completeness.TwoQuery
 import AverageCaseComplexity.Completeness.FairTables
 import AverageCaseComplexity.Completeness.SourceReplay
 import AverageCaseComplexity.Completeness.TupleDecodingRuntime
+import AverageCaseComplexity.Completeness.ExactVoteRuntime
+import AverageCaseComplexity.Completeness.RawDecoderRuntime
 import Lean
 
 open AverageCaseComplexity AverageCaseComplexity.Completeness.TwoQuery
@@ -15,7 +17,8 @@ run_cmd do
       ``targetProgram_correct, ``targetProgram_useful, ``CompiledSource.reduction_trace,
       ``CompiledSource.reduction_run, ``run_coinDesc, ``specialize_clocked_source,
       ``replay_clocked_sampler, ``rawCompiler_correct, ``compile_algorithm, ``compile_sampler,
-      ``decodeSD_efficient, ``decodeSeed_efficient, ``decode_efficient] do
+      ``coinWords_count, ``guardedExactVote_efficient, ``guardedExactVote_eq_guardedReplayBit,
+      ``decodeRawFields_efficient, ``decodeSD_efficient, ``decodeSeed_efficient, ``decode_efficient] do
     for axiomName in ← Lean.collectAxioms decl do
       unless allowed.contains axiomName do
         throwError "Unexpected axiom {axiomName} in {decl}"
