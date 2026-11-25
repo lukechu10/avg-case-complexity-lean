@@ -8,10 +8,11 @@ import Lean
 
 open AverageCaseComplexity AverageCaseComplexity.Completeness.TwoQuery
 
--- These are unconditional milestones even while runtime certification is pending.
+-- Audit the final completeness certificate as well as key intermediate contracts.
 run_cmd do
   let allowed := #[``propext, ``Classical.choice, ``Quot.sound]
-  for decl in #[``exactLanguageBit_eq, ``reliabilityTest_accept_lower,
+  for decl in #[``complete, ``problem_avgBPP, ``distribution_psamp, ``sampler_efficient,
+      ``targetProgram_efficient, ``replayAnswer_efficient, ``replaySample_efficient, ``exactLanguageBit_eq, ``reliabilityTest_accept_lower,
       ``reliabilityTest_accept_upper, ``sampler_eval, ``sampler_output_length,
       ``distribution_mass_lower, ``distribution_mass_upper, ``exactBranchTest_efficient,
       ``targetProgram_correct, ``targetProgram_useful, ``CompiledSource.reduction_trace,

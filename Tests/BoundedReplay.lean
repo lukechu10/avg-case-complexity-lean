@@ -24,3 +24,11 @@ private def code := specializeCode header ⟨1, by decide⟩
 #guard exactLanguageBit code 1 [] true == true
 -- A raw sampler receives unary length, and short output is padded on the right.
 #guard (replaySample header 3 [true, false]).toWord == [true, false, false]
+
+-- Distinct header symbols and a complete transition table are required.
+private def badHeader := encodeRawPair (table false) (table true) 5 5
+#guard (decodeRawFairMachine badHeader).isNone
+#guard (decodeRawFairMachine header.dropLast).isNone
+#guard (replaySample badHeader 3 [true, true]).toWord == [false, false, false]
+-- The interpreter must not allocate the full unary accuracy for a short run.
+#guard replayAnswer (specializeCode header ⟨2 ^ 60, by decide⟩) [] [false, true] == some true

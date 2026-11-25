@@ -1,5 +1,6 @@
 module
 
+public import AverageCaseComplexity.Completeness.BoundedReplayRuntime
 public import AverageCaseComplexity.Completeness.TableCompiler
 public import AverageCaseComplexity.Completeness.FairReplay
 public import AverageCaseComplexity.Completeness.TailBounds
@@ -8,6 +9,8 @@ public import AverageCaseComplexity.Completeness.TupleEncoding
 public import AverageCaseComplexity.Completeness.LengthNormalization
 public import AverageCaseComplexity.Completeness.CompactCode
 public import AverageCaseComplexity.Completeness.VoteRuntime
+public import AverageCaseComplexity.Completeness.TupleDecodingRuntime
+public import AverageCaseComplexity.Completeness.ExactVoteRuntime
 public import AverageCaseComplexity.Completeness.SeedMass
 public import AverageCaseComplexity.Reductions.Closure
 public import AverageCaseComplexity.Reductions.TwoQueryMachine
@@ -189,9 +192,104 @@ theorem sampler_output_length (n : ℕ) (w : Word)
         rw [← hlength]
         apply encodeSeed_length_congr <;> simp [Instance.seed]
 
+section SamplerRuntime
+open Turing.MultiTapeTM ComputableTidilyInPolyTime Cslib Cslib.Probability
+
+private abbrev SeedInput := ℕ × Word
+private abbrev seedInputEnc := encPair encUnary encBits
+private abbrev SampledInput := SeedInput × Word
+private abbrev sampledInputEnc := encPair seedInputEnc encBits
+
+private def emitSample (p : SampledInput) (b : Bool) : Word :=
+  let s := seedCandidate p.1.2
+  if b then encode ⟨s.machineCode, p.2, s.clockBits.length, s.fallback, s.samplerCode,
+    s.samplerClockBits.length⟩ else List.replicate p.1.1 true
+
+private theorem emitSample_efficient : ComputableTidilyInPolyTime
+    (fun p : SampledInput × Bool => emitSample p.1 p.2) (encPair sampledInputEnc encBool) encBits := by
+  obtain ⟨ha,_,hc,hb,hd,he⟩ := seedCandidate_fields
+  have w := (fst seedInputEnc encBits).snd'
+  have x := snd seedInputEnc encBits
+  have n := (fst seedInputEnc encBits).fst'
+  let z := fun p : SampledInput =>
+    let s := seedCandidate p.1.2
+    (⟨s.machineCode,p.2,s.clockBits.length,s.fallback,s.samplerCode,s.samplerClockBits.length⟩ : Instance)
+  have rep (f : SampledInput → Word) (h : ComputableTidilyInPolyTime f sampledInputEnc encBits) :
+      ComputableTidilyInPolyTime (fun p => List.replicate (f p).length true) sampledInputEnc encBits := by
+    simpa only [Function.comp_def] using (bitsReplicate true).comp (length_bits.comp h)
+  have hyes : ComputableTidilyInPolyTime (fun p => encode (z p)) sampledInputEnc encBits := by
+    apply encodeSeed_efficient_with (seed := fun p => (z p).seed)
+    all_goals dsimp only [z, Instance.seed]
+    · exact ha.comp w
+    · exact x
+    · exact rep _ (hc.comp w)
+    · exact hb.comp w
+    · exact hd.comp w
+    · exact rep _ (he.comp w)
+  have hno := (bitsReplicate true).comp n
+  exact (snd sampledInputEnc encBool).ite' (hyes.comp (fst sampledInputEnc encBool))
+    (hno.comp (fst sampledInputEnc encBool))
+
+attribute [local irreducible] seedCandidate decodeSeed replaySample replayAnswer fairTape
+
+set_option maxHeartbeats 500000 in
+/-- Algorithm 3.1, assembled from certified bounded replay of the sampled source
+and the candidate answer machine. All intermediate machine outputs are words. -/
+theorem sampler_efficient_of_replay
+    (hanswer : ComputableTidilyInPolyTime (fun p : Word × Word × Word => replayAnswer p.1 p.2.1 p.2.2)
+      (encPair encBits (encPair encBits encBits)) answerEncoding)
+    (hsample : ComputableTidilyInPolyTime (fun p : Word × ℕ × Word => (replaySample p.1 p.2.1 p.2.2).toWord)
+      (encPair encBits (encPair encUnary encBits)) encBits) :
+    IsPPTOn unaryEncoding (Function.Embedding.refl Word) sampler := by
+  obtain ⟨ha,hx,hc,_,hd,he⟩ := seedCandidate_fields
+  let z (p : SeedInput) := seedCandidate p.2
+  have w := snd encUnary encBits
+  have len : ComputableTidilyInPolyTime (fun p : SeedInput => (z p).input.length) seedInputEnc encUnary := by simpa only [z,Function.comp_def] using length_bits.comp (hx.comp w)
+  have sc : ComputableTidilyInPolyTime (fun p : SeedInput => (z p).samplerClockBits.length) seedInputEnc encUnary := by simpa only [z,Function.comp_def] using length_bits.comp (he.comp w)
+  let draw (p : SeedInput) := (fun coins => (replaySample (z p).samplerCode (z p).input.length coins).toWord) <$>
+    fairTape (z p).samplerClockBits.length
+  have hdraw : IsPPTOn seedInputEnc encBits draw := by
+    have pf := fst seedInputEnc encBits
+    have hprep : ComputableTidilyInPolyTime (fun p : SeedInput × Word => ((z p.1).samplerCode, (z p.1).input.length, p.2))
+        sampledInputEnc (encPair encBits (encPair encUnary encBits)) := ((hd.comp w).comp pf).prod ((len.comp pf).prod (snd seedInputEnc encBits))
+    exact (fairTape_efficient.preprocess sc).map_with (f := fun p coins => (replaySample (z p).samplerCode (z p).input.length coins).toWord) (hsample.comp hprep)
+  let test (p : SampledInput) := reliabilityTest (z p.1).machineCode (z p.1).clockBits.length p.2 p.1.1
+  have htest : IsPPTOn sampledInputEnc encBool test := by
+    have pf := fst seedInputEnc encBits
+    have ps := snd seedInputEnc encBits
+    have hc' := length_bits.comp ((hc.comp w).comp pf)
+    apply reliabilityProgram_efficient (count := fun p : SampledInput => 200 * p.1.1 ^ 2)
+    · apply (fairTape_efficient.preprocess hc').map_with
+        (f := fun p coins => replayAnswer (z p.1).machineCode p.2 coins)
+      have q := fst sampledInputEnc encBits
+      exact hanswer.comp ((((ha.comp w).comp pf).comp q).prod ((ps.comp q).prod (snd sampledInputEnc encBits)))
+    · have hn : ComputableTidilyInPolyTime (fun p : SampledInput => p.1.1) sampledInputEnc encUnary := pf.fst'
+      fun_prop
+  let after (p : SampledInput) := emitSample p <$> test p
+  have hafter : IsPPTOn sampledInputEnc encBits after := htest.map_with (f := emitSample) emitSample_efficient
+  let body (p : SeedInput) := if (decodeSeed p.2).isSome then (draw p >>= fun x => after (p,x)) else pure p.2
+  have hbody : IsPPTOn seedInputEnc encBits body :=
+    IsPPTOn.cond (optionIsSome (decodeSeed_efficient.comp w))
+      (hdraw.bind_with (second := fun p x => after (p,x)) hafter) w.isPPTOn
+  have h := fairTape_efficient.bind_with (second := fun n w => body (n,w)) hbody
+  apply h.congr
+  intro n
+  rw [sampler, ProbComp.eval_bind, ProbComp.eval_bind]
+  congr 1
+  funext w
+  cases hw : decodeSeed w with
+  | none => simp [body, hw]
+  | some s =>
+    have hz : seedCandidate w = s := by rw [← decodeSeed_encodeSeed_eq w s hw, seedCandidate_encodeSeed]
+    subst s
+    simp [body, hw, draw, after, test, z, boundedSampleProgram]
+    rfl
+
+end SamplerRuntime
+
 theorem sampler_efficient :
-    Cslib.Probability.IsPPTOn unaryEncoding (Function.Embedding.refl Word) sampler := by
-  sorry
+    Cslib.Probability.IsPPTOn unaryEncoding (Function.Embedding.refl Word) sampler :=
+  sampler_efficient_of_replay replayAnswer_efficient replaySample_efficient
 
 /-- Normalize the executable sampler's output into a length-indexed PMF.
 The fixed-length theorem shows this does not change its output law. -/
@@ -358,9 +456,180 @@ theorem exactBranchTest_efficient {α : Type} {input : α ↪ Word} {steps k : �
     simpa only [Function.comp_apply, Nat.size_eq_bits_len] using ComputableTidilyInPolyTime.unary_lt' hm
       (ComputableTidilyInPolyTime.length_bits.comp hbits)
 
-theorem targetProgram_efficient :
+open Turing.MultiTapeTM in
+set_option maxHeartbeats 1000000 in
+theorem targetProgram_efficient_of_replay
+    (hreplay : ComputableTidilyInPolyTime
+      (fun p : Word × Word × Word => replayAnswer p.1 p.2.1 p.2.2)
+      (Turing.MultiTapeTM.encPair Turing.MultiTapeTM.encBits
+        (Turing.MultiTapeTM.encPair Turing.MultiTapeTM.encBits Turing.MultiTapeTM.encBits))
+      answerEncoding) :
     Cslib.Probability.IsPPTOn schemeInputEncoding answerEncoding targetProgram := by
-  sorry
+  classical
+  let code : Word × Accuracy → Word := fun a => (seedCandidate a.1).machineCode
+  let input : Word × Accuracy → Word := fun a => (seedCandidate a.1).input
+  let steps : Word × Accuracy → ℕ := fun a => (seedCandidate a.1).clockBits.length
+  let fallback : Word × Accuracy → Bool := fun a => (seedCandidate a.1).fallback
+  let k : Word × Accuracy → ℕ := fun a => a.2.val
+  let replay : (Word × Accuracy) × Word → Answer :=
+    fun p => replayAnswer (code p.1) (input p.1) p.2
+  let vote : Word × Accuracy → Bool := guardedExactVote steps k fallback replay
+  have hfields := seedCandidate_fields
+  have hword := schemeInput_word_efficient
+  have hcode : ComputableTidilyInPolyTime code schemeInputEncoding encBits := by
+    exact hfields.1.comp hword
+  have hinput : ComputableTidilyInPolyTime input schemeInputEncoding encBits := by
+    exact hfields.2.1.comp hword
+  have hclock : ComputableTidilyInPolyTime
+      (fun a : Word × Accuracy => (seedCandidate a.1).clockBits)
+      schemeInputEncoding encBits := hfields.2.2.1.comp hword
+  have hsteps : ComputableTidilyInPolyTime steps schemeInputEncoding encUnary := by
+    exact ComputableTidilyInPolyTime.length_bits.comp hclock
+  have hfallback : ComputableTidilyInPolyTime fallback schemeInputEncoding encBool :=
+    hfields.2.2.2.1.comp hword
+  have hk : ComputableTidilyInPolyTime k schemeInputEncoding encUnary :=
+    schemeInput_index_efficient
+  have htriple : ComputableTidilyInPolyTime
+      (fun p : (Word × Accuracy) × Word =>
+        (code p.1, (input p.1, p.2)))
+      (encPair schemeInputEncoding encBits)
+      (encPair encBits (encPair encBits encBits)) := by
+    have hf := ComputableTidilyInPolyTime.fst schemeInputEncoding encBits
+    have hs := ComputableTidilyInPolyTime.snd schemeInputEncoding encBits
+    exact (hcode.comp hf).prod ((hinput.comp hf).prod hs)
+  have hreplay' : ComputableTidilyInPolyTime replay
+      (encPair schemeInputEncoding encBits) answerEncoding := by
+    exact hreplay.comp htriple
+  have hvote : ComputableTidilyInPolyTime vote schemeInputEncoding encBool := by
+    exact guardedExactVote_efficient hsteps hk hfallback hreplay'
+  have hinputLength : ComputableTidilyInPolyTime
+      (fun a : Word × Accuracy => (input a).length + burnIn)
+      schemeInputEncoding encUnary := by
+    fun_prop
+  have hvalid : ComputableTidilyInPolyTime
+      (fun a : Word × Accuracy => decide ((input a).length + burnIn < steps a))
+      schemeInputEncoding encBool :=
+    ComputableTidilyInPolyTime.unary_lt' hinputLength hsteps
+  have hexact : ComputableTidilyInPolyTime
+      (fun a : Word × Accuracy => decide (steps a < (k a).size))
+      schemeInputEncoding encBool := by
+    exact exactBranchTest_efficient hsteps hk
+  have hparsed : ComputableTidilyInPolyTime
+      (fun a : Word × Accuracy => decide ((decode a.1).isSome = true))
+      schemeInputEncoding encBool := by
+    have hd := (decode_efficient.comp hword).optionIsSome
+    exact hd.of_enc_eq (fun a => by simp)
+  have hmajorityCount : ComputableTidilyInPolyTime
+      (fun a : Word × Accuracy => 200 * steps a ^ 2)
+      schemeInputEncoding encUnary := by
+    fun_prop
+  have hmajorityTape : Cslib.Probability.IsPPTOn schemeInputEncoding encBits
+      (fun a => fairTape (steps a)) := fairTape_efficient.preprocess hsteps
+  have hmajorityRun : Cslib.Probability.IsPPTOn schemeInputEncoding answerEncoding
+      (fun a => boundedAnswerProgram (code a) (steps a) (input a)) := by
+    exact hmajorityTape.map_with (f := fun a coins =>
+      replayAnswer (code a) (input a) coins) (hreplay'.of_enc_eq (fun _ => rfl))
+  have hmajority := majorityProgram_efficient hmajorityRun hmajorityCount
+  have hzero : Cslib.Probability.IsPPTOn schemeInputEncoding encBits
+      (fun _ : Word × Accuracy => fairTape 0) :=
+    fairTape_efficient.preprocess (.const 0)
+  have hsomeVote : ComputableTidilyInPolyTime
+      (fun a : Word × Accuracy => some (vote a)) schemeInputEncoding answerEncoding := by
+    have h : ComputableTidilyInPolyTime
+        (fun a : Word × Accuracy => if vote a = true then (some true : Answer)
+          else some false) schemeInputEncoding answerEncoding :=
+      hvote.cond (.const (some true : Answer)) (.const (some false : Answer))
+    exact h.of_enc_eq (fun a => by cases vote a <;> rfl)
+  have hsomeVotePair : ComputableTidilyInPolyTime
+      (fun p : (Word × Accuracy) × Word => some (vote p.1))
+      (encPair schemeInputEncoding encBits) answerEncoding := by
+    exact (hsomeVote.comp (ComputableTidilyInPolyTime.fst schemeInputEncoding encBits)).of_enc_eq
+      (fun _ => rfl)
+  have hexactRun : Cslib.Probability.IsPPTOn schemeInputEncoding answerEncoding
+      (fun a => pure (some (vote a))) := by
+    have hmapped := hzero.map_with (f := fun a _ => some (vote a)) hsomeVotePair
+    exact hmapped.congr (fun a => by simp)
+  have hconstant : Cslib.Probability.IsPPTOn schemeInputEncoding answerEncoding
+      (fun _ : Word × Accuracy => pure (some false)) := by
+    have hconstantPair : ComputableTidilyInPolyTime
+        (fun p : (Word × Accuracy) × Word => (some false : Answer))
+        (encPair schemeInputEncoding encBits) answerEncoding := .const (some false)
+    have hmapped := hzero.map_with (f := fun _ _ => (some false : Answer)) hconstantPair
+    exact hmapped.congr (fun _ => by simp)
+  let valid : Word × Accuracy → Prop := fun a =>
+    (input a).length + burnIn < steps a
+  let exactBranch : Word × Accuracy → Prop := fun a => steps a < (k a).size
+  have hinner : Cslib.Probability.IsPPTOn schemeInputEncoding answerEncoding
+      (fun a => if exactBranch a then pure (some (vote a))
+        else majorityProgram (boundedAnswerProgram (code a) (steps a) (input a))
+          (200 * steps a ^ 2)) := by
+    exact Cslib.Probability.IsPPTOn.ite hexact hexactRun hmajority
+  have hvalidBranch : Cslib.Probability.IsPPTOn schemeInputEncoding answerEncoding
+      (fun a => if valid a then
+        (if exactBranch a then pure (some (vote a))
+        else majorityProgram (boundedAnswerProgram (code a) (steps a) (input a))
+          (200 * steps a ^ 2))
+        else pure (some false)) := by
+    exact Cslib.Probability.IsPPTOn.ite hvalid hinner hconstant
+  let parsed : Word × Accuracy → Prop := fun a => (decode a.1).isSome = true
+  have hstaged : Cslib.Probability.IsPPTOn schemeInputEncoding answerEncoding
+      (fun a => if parsed a then
+          (if valid a then
+            (if exactBranch a then pure (some (vote a))
+            else majorityProgram (boundedAnswerProgram (code a) (steps a) (input a))
+              (200 * steps a ^ 2))
+          else pure (some false))
+        else pure (some false)) := by
+    exact Cslib.Probability.IsPPTOn.ite hparsed hvalidBranch hconstant
+  apply hstaged.congr
+  intro a
+  unfold targetProgram
+  split
+  · rename_i hparsed
+    have hsome : (decode a.1).isSome = true := by simpa [parsed] using hparsed
+    rcases Option.isSome_iff_exists.mp hsome with ⟨z, hdec⟩
+    have hx : encode z = a.1 := decode_sound a.1 z hdec
+    have hcand : instanceCandidate a.1 = z := by
+      rw [← hx]
+      exact instanceCandidate_encode z
+    have hcodeEq : code a = z.machineCode := by
+      change (instanceCandidate a.1).machineCode = z.machineCode
+      exact congrArg Instance.machineCode hcand
+    have hinputEq : input a = z.input := by
+      change (instanceCandidate a.1).input = z.input
+      exact congrArg Instance.input hcand
+    have hstepsEq : steps a = z.steps := by
+      change (instanceCandidate a.1).steps = z.steps
+      exact congrArg Instance.steps hcand
+    have hfallbackEq : fallback a = z.fallback := by
+      change (instanceCandidate a.1).fallback = z.fallback
+      exact congrArg Instance.fallback hcand
+    have hvote_eq (he : z.steps < a.2.val.size) :
+        vote a = exactLanguageBit z.machineCode z.steps z.input z.fallback := by
+      dsimp [vote]
+      rw [guardedExactVote_eq_guardedReplayBit]
+      simp only [hstepsEq, k, he, if_pos, hfallbackEq]
+      congr 1
+      funext coins
+      simp [replay, hcodeEq, hinputEq]
+    by_cases hv : z.input.length + burnIn < z.steps
+    · by_cases he : z.steps < a.2.val.size
+      · simp [hdec, valid, exactBranch, hinputEq, hstepsEq, hcodeEq, k, hv, he,
+          hvote_eq he]
+      · simp [hdec, valid, exactBranch, hinputEq, hstepsEq, hcodeEq, k, hv, he,
+          majorityProgram_eval, boundedAnswerProgram_eval]
+    · simp [hdec, valid, exactBranch, hinputEq, hstepsEq, hcodeEq, k, hv,
+        majorityProgram_eval, boundedAnswerProgram_eval]
+  · rename_i hparsed
+    have hnone : decode a.1 = none := by
+      by_contra hn
+      have hs : (decode a.1).isSome = true := Option.isSome_iff_ne_none.mpr hn
+      exact hparsed (by simpa [parsed] using hs)
+    simp [hnone]
+
+theorem targetProgram_efficient :
+    Cslib.Probability.IsPPTOn schemeInputEncoding answerEncoding targetProgram :=
+  targetProgram_efficient_of_replay replayAnswer_efficient
 
 /-- Arithmetic bound on the exact branch's enumeration count. The full
 machine-level cost of enumeration and simulation remains to be certified. -/
