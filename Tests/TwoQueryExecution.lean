@@ -15,7 +15,7 @@ run_cmd do
       ``targetProgram_correct, ``targetProgram_useful, ``CompiledSource.reduction_trace,
       ``CompiledSource.reduction_run, ``run_coinDesc, ``specialize_clocked_source,
       ``replay_clocked_sampler, ``rawCompiler_correct, ``compile_algorithm, ``compile_sampler,
-      ``decodeSD_efficient] do
+      ``decodeSD_efficient, ``decodeSeed_efficient, ``decode_efficient] do
     for axiomName in ← Lean.collectAxioms decl do
       unless allowed.contains axiomName do
         throwError "Unexpected axiom {axiomName} in {decl}"
