@@ -81,51 +81,77 @@ def encodeReadSymbol : Option ℕ → ℕ
   | none => 0
   | some symbol => symbol + 1
 
-def decodeReadSymbol (symbol : ℕ) : Option (Option ℕ) :=
-  if symbol = 0 then some none else some (some (symbol - 1))
+def decodeReadSymbol (symbol : ℕ) : Option ℕ :=
+  if symbol = 0 then none else some (symbol - 1)
+
+@[simp] theorem decodeReadSymbol_encodeReadSymbol (symbol : Option ℕ) :
+    decodeReadSymbol (encodeReadSymbol symbol) = symbol := by
+  cases symbol with
+  | none => rfl
+  | some n => simp [decodeReadSymbol, encodeReadSymbol]
 
 def encodeWriteSymbol : Option (Option ℕ) → ℕ
   | none => 0
   | some none => 1
   | some (some symbol) => symbol + 2
 
-def decodeWriteSymbol (symbol : ℕ) : Option (Option (Option ℕ)) :=
-  if symbol = 0 then some none
-  else if symbol = 1 then some (some none)
-  else some (some (some (symbol - 2)))
+def decodeWriteSymbol (symbol : ℕ) : Option (Option ℕ) :=
+  if symbol = 0 then none
+  else if symbol = 1 then some none
+  else some (some (symbol - 2))
 
-def decodeMove (move : ℕ) : Option SignType :=
+@[simp] theorem decodeWriteSymbol_encodeWriteSymbol (symbol : Option (Option ℕ)) :
+    decodeWriteSymbol (encodeWriteSymbol symbol) = symbol := by
+  cases symbol with
+  | none => rfl
+  | some symbol => cases symbol with
+    | none => rfl
+    | some n => simp [decodeWriteSymbol, encodeWriteSymbol]
+
+def decodeMove (move : ℕ) : SignType :=
   match move with
-  | 0 => some SignType.neg
-  | 1 => some SignType.zero
-  | 2 => some SignType.pos
-  | _ => none
+  | 0 => SignType.neg
+  | 1 => SignType.zero
+  | 2 => SignType.pos
+  | _ => SignType.zero
+
+def validMove (move : ℕ) : Bool := decide (move ≤ 2)
 
 def encodeMove : SignType → ℕ
   | .neg => 0
   | .zero => 1
   | .pos => 2
 
+@[simp] theorem decodeMove_encodeMove (move : SignType) :
+    decodeMove (encodeMove move) = move := by
+  cases move <;> rfl
+
+def takeRawFields : ℕ → List ℕ → Option (List ℕ × List ℕ)
+  | 0, fields => some ([], fields)
+  | _ + 1, [] => none
+  | n + 1, field :: fields => do
+      let (front, rest) ← takeRawFields n fields
+      return (field :: front, rest)
+
+theorem takeRawFields_append_self (pre suffix : List ℕ) :
+    takeRawFields pre.length (pre ++ suffix) = some (pre, suffix) := by
+  induction pre with
+  | nil => rfl
+  | cons field pre ih => simp [takeRawFields, ih]
+
 def decodeRawRow (tapes : ℕ) (fields : List ℕ) :
     Option (Turing.MultiTapeTM.Universal.Key × Turing.MultiTapeTM.Universal.Act) := do
-  if fields.length ≠ 5 + 3 * tapes then none else
-  let q := fields.headD 0
-  let inputSymbol ← decodeReadSymbol (fields[1]?.getD 0)
-  let afterKey := fields.drop 2
-  let workSymbols ← (afterKey.take tapes).mapM decodeReadSymbol
-  let afterWork := afterKey.drop tapes
-  let inputDirection ← decodeMove (afterWork.headD 3)
-  let afterInputMove := afterWork.drop 1
-  let workWrites ← (afterInputMove.take tapes).mapM decodeWriteSymbol
-  let afterWrites := afterInputMove.drop tapes
-  let workDirections ← (afterWrites.take tapes).mapM decodeMove
-  let afterDirections := afterWrites.drop tapes
-  let emitted ← decodeReadSymbol (afterDirections.headD 0)
-  let nextCode := (afterDirections.drop 1).headD 0
-  if (afterDirections.drop 2).isEmpty then
-    let transitions := workWrites.zip workDirections
-    return (⟨q, inputSymbol, workSymbols⟩,
-      ⟨inputDirection, transitions, emitted,
+  let q :: inputCode :: rest := fields | none
+  let (workCodes, rest) ← takeRawFields tapes rest
+  let inputMoveCode :: rest := rest | none
+  let (writeCodes, rest) ← takeRawFields tapes rest
+  let (workMoveCodes, rest) ← takeRawFields tapes rest
+  let [outputCode, nextCode] := rest | none
+  if (inputMoveCode :: workMoveCodes).all validMove then
+    return (⟨q, decodeReadSymbol inputCode, workCodes.map decodeReadSymbol⟩,
+      ⟨decodeMove inputMoveCode,
+        (writeCodes.map decodeWriteSymbol).zip (workMoveCodes.map decodeMove),
+        decodeReadSymbol outputCode,
         if nextCode = 0 then none else some (nextCode - 1)⟩)
   else none
 
@@ -144,28 +170,33 @@ def encodeRawRows (rows : List (Key × Act)) : List ℕ :=
 def RawRowShape (tapes : ℕ) (row : Key × Act) : Prop :=
   row.1.work.length = tapes ∧ row.2.workTapes.length = tapes
 
+theorem zipMapFstSnd (values : List (α × β)) :
+    (values.map Prod.fst).zip (values.map Prod.snd) = values := by
+  induction values with
+  | nil => rfl
+  | cons value values ih => simp [ih]
+
 theorem decodeRawRow_encodeRawRow (tapes : ℕ) (row : Key × Act)
     (hshape : RawRowShape tapes row) :
     decodeRawRow tapes (encodeRawRow row) = some row := by
   rcases row with ⟨key, action⟩
   rcases key with ⟨state, input, work⟩
   rcases action with ⟨inputMove, workTapes, output, next⟩
-  simp [RawRowShape, encodeRawRow, decodeRawRow, encodeReadSymbol, decodeReadSymbol,
-    encodeWriteSymbol, decodeWriteSymbol, encodeMove, decodeMove, hshape,
-    List.mapM_map, Function.comp_def, Nat.add_sub_cancel]
+  rcases hshape with ⟨hwork, hactions⟩
+  change work.length = tapes at hwork
+  change workTapes.length = tapes at hactions
+  have ht (l r : List ℕ) (hl : l.length = tapes) :
+      takeRawFields tapes (l ++ r) = some (l,r) := hl ▸ takeRawFields_append_self l r
+  have valid (m : SignType) : validMove (encodeMove m) = true := by cases m <;> rfl
+  cases next <;>
+    simp [decodeRawRow, encodeRawRow, List.append_assoc, ht, hwork, hactions,
+      Function.comp_def, valid, zipMapFstSnd]
 
 def encodeRawPair (falseDesc trueDesc : Desc) (falseSymbol trueSymbol : ℕ) : Word :=
   encodeRawFields
     ([falseDesc.tapes, falseDesc.q₀, falseSymbol, trueSymbol,
       falseDesc.table.length, trueDesc.table.length] ++
       encodeRawRows falseDesc.table ++ encodeRawRows trueDesc.table)
-
-def takeRawFields : ℕ → List ℕ → Option (List ℕ × List ℕ)
-  | 0, fields => some ([], fields)
-  | _ + 1, [] => none
-  | n + 1, field :: fields => do
-      let (front, rest) ← takeRawFields n fields
-      return (field :: front, rest)
 
 /-- Parse exactly `fuel` rows, rejecting incomplete rows and trailing fields. -/
 def decodeRawRowsAux (tapes : ℕ) : ℕ → List ℕ →
@@ -184,6 +215,69 @@ def decodeRawRows (tapes : ℕ) (fields : List ℕ) :
     Option (List (Turing.MultiTapeTM.Universal.Key × Turing.MultiTapeTM.Universal.Act)) :=
   let width := 5 + 3 * tapes
   decodeRawRowsAux tapes (fields.length / width) fields
+
+def RawRowsShape (tapes : ℕ) (rows : List (Key × Act)) : Prop :=
+  ∀ row ∈ rows, RawRowShape tapes row
+
+theorem encodeRawRow_length (tapes : ℕ) (row : Key × Act)
+    (hshape : RawRowShape tapes row) :
+    (encodeRawRow row).length = 5 + 3 * tapes := by
+  rcases row with ⟨key, action⟩
+  rcases key with ⟨state, input, work⟩
+  rcases action with ⟨inputMove, workTapes, output, next⟩
+  have ⟨hwork, hactions⟩ := hshape
+  change work.length = tapes at hwork
+  change workTapes.length = tapes at hactions
+  simp [encodeRawRow, hwork, hactions]
+  omega
+
+theorem encodeRawRows_length (tapes : ℕ) (rows : List (Key × Act))
+    (hshape : RawRowsShape tapes rows) :
+    (encodeRawRows rows).length = rows.length * (5 + 3 * tapes) := by
+  induction rows with
+  | nil => simp [encodeRawRows]
+  | cons row rows ih =>
+      have hr := hshape row (by simp)
+      have hs : RawRowsShape tapes rows := by
+        intro r hr
+        exact hshape r (by simp [hr])
+      change (encodeRawRow row ++ encodeRawRows rows).length =
+        (row :: rows).length * (5 + 3 * tapes)
+      rw [List.length_append, encodeRawRow_length tapes row hr, ih hs]
+      simp only [List.length_cons]
+      ring
+
+theorem decodeRawRowsAux_encodeRawRows (tapes : ℕ) (rows : List (Key × Act))
+    (hshape : RawRowsShape tapes rows) :
+    decodeRawRowsAux tapes rows.length (encodeRawRows rows) = some rows := by
+  induction rows with
+  | nil => simp [decodeRawRowsAux, encodeRawRows]
+  | cons row rows ih =>
+      have hr := hshape row (by simp)
+      have hs : RawRowsShape tapes rows := by
+        intro r hr'
+        exact hshape r (by simp [hr'])
+      have hrow := encodeRawRow_length tapes row hr
+      have htake : takeRawFields (5 + 3 * tapes)
+          (encodeRawRow row ++ encodeRawRows rows) =
+          some (encodeRawRow row, encodeRawRows rows) := by
+        rw [← hrow]
+        exact takeRawFields_append_self _ _
+      change decodeRawRowsAux tapes (Nat.succ rows.length)
+        (encodeRawRow row ++ encodeRawRows rows) = some (row :: rows)
+      simp [decodeRawRowsAux, htake, decodeRawRow_encodeRawRow tapes row hr, ih hs]
+
+theorem decodeRawRows_encodeRawRows (tapes : ℕ) (rows : List (Key × Act))
+    (hshape : RawRowsShape tapes rows) :
+    decodeRawRows tapes (encodeRawRows rows) = some rows := by
+  dsimp [decodeRawRows]
+  rw [encodeRawRows_length tapes rows hshape]
+  have hw : 0 < 5 + 3 * tapes := by omega
+  rw [show rows.length * (5 + 3 * tapes) /
+      (5 + 3 * tapes) = rows.length by
+        rw [Nat.mul_comm]
+        exact Nat.mul_div_right _ hw]
+  exact decodeRawRowsAux_encodeRawRows tapes rows hshape
 
 /-- The two coin-selected transition tables of a checked raw machine. -/
 structure RawFairMachine where
@@ -208,6 +302,28 @@ def decodeRawFairMachine (code : Word) : Option RawFairMachine := do
       else none
   | _ => none
 
+theorem decodeRawFairMachine_encodeRawPair
+    (falseDesc trueDesc : Desc) (falseSymbol trueSymbol : ℕ)
+    (htapes : trueDesc.tapes = falseDesc.tapes)
+    (hinitial : trueDesc.q₀ = falseDesc.q₀)
+    (hsymbol : falseSymbol ≠ trueSymbol)
+    (hfalse : RawRowsShape falseDesc.tapes falseDesc.table)
+    (htrue : RawRowsShape trueDesc.tapes trueDesc.table) :
+    decodeRawFairMachine (encodeRawPair falseDesc trueDesc falseSymbol trueSymbol) =
+      some ⟨falseDesc.tapes, falseDesc.q₀, falseSymbol, trueSymbol,
+        falseDesc.table, trueDesc.table⟩ := by
+  have hshape : RawRowsShape falseDesc.tapes (falseDesc.table ++ trueDesc.table) := by
+    intro row hrow
+    rcases List.mem_append.mp hrow with hrow | hrow
+    · exact hfalse row hrow
+    · simpa [htapes] using htrue row hrow
+  have hrows : encodeRawRows falseDesc.table ++ encodeRawRows trueDesc.table =
+      encodeRawRows (falseDesc.table ++ trueDesc.table) := by
+    simp [encodeRawRows]
+  simp [decodeRawFairMachine, encodeRawPair, decodeRawFields_encodeRawFields,
+    hrows, decodeRawRows_encodeRawRows falseDesc.tapes
+      (falseDesc.table ++ trueDesc.table) hshape, htapes, hinitial, hsymbol]
+
 def rawInputSymbols (machine : RawFairMachine) (input : Word) : List ℕ :=
   input.map fun bit => if bit then machine.trueSymbol else machine.falseSymbol
 
@@ -216,9 +332,7 @@ def runTables (machine : RawFairMachine) (input : List ℕ) (coins : Word) : Lis
   let trueDesc : Desc := ⟨machine.tapes, machine.initial, machine.trueTable⟩
   let initialCfg : SCfg := init falseDesc
   let step (cfg : SCfg × List ℕ) (coin : Bool) : SCfg × List ℕ :=
-    if cfg.1.state.isNone then cfg
-    else
-      stepOut (if coin then trueDesc else falseDesc) input cfg
+    stepOut (if coin then trueDesc else falseDesc) input cfg
   (coins.foldl step (initialCfg, [])).2
 
 def runRaw (machine : RawFairMachine) (input coins : Word) : List ℕ :=

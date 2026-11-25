@@ -1,6 +1,6 @@
 module
 
-public import AverageCaseComplexity.Completeness.BoundedMachine
+public import AverageCaseComplexity.Completeness.TableCompiler
 public import AverageCaseComplexity.Completeness.FairReplay
 public import AverageCaseComplexity.Completeness.TailBounds
 public import AverageCaseComplexity.Completeness.ThresholdBounds
@@ -576,14 +576,16 @@ theorem compile_algorithm (A : PolyTimeRandomizedScheme) :
       (∀ k, 2 ^ (code k).length ≤ sizeCoefficient * (k.val + 1)) ∧
       (∀ x k, boundedAnswer (code k)
         (c * (x.length + k.val + 2) ^ d + x.length + burnIn + 1) x = A.run x k) := by
-  sorry
+  obtain ⟨header,c,d,hlaw⟩ := specialize_clocked_source rawCompiler_correct A
+  exact ⟨specializeCode header, c, d, _, specializeCode_efficient header,
+    specializeCode_size header, hlaw⟩
 
 /-- Compile the exact sampler, including its strict clock, to boundedSample.
 Normalization does not change a sampler already supported on length-n words. -/
 theorem compile_sampler (D : Ensemble) (hD : PSamp D) :
     ∃ (code : Word) (c d : ℕ), ∀ n,
       boundedSample code (c * (n + 1) ^ d) n = D n := by
-  sorry
+  exact replay_clocked_sampler rawCompiler_correct D hD
 
 /-- Compilation data only: no reduction, domination, or completeness is assumed.
 Binary specialization is essential: a unary k in the code would make the
