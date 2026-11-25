@@ -65,10 +65,10 @@ theorem replayAnswer_efficient_of_decoders
   apply h.of_enc_eq
   rintro ⟨code,x,coins⟩
   cases ht : decodeSpecializedCode code with
-  | none => simp [replayAnswer, ht, ctx, Function.comp_def]
+  | none => simp [replayAnswer, ht]
   | some pair =>
     cases hm : decodeRawFairMachine pair.1 <;>
-      simp [replayAnswer, ht, ctx, mach, fields, value, hm, Function.comp_def]
+      simp [replayAnswer, ht, ctx, mach, fields, value, hm]
 
 /-- Compile bounded unary sampler execution, including rejection and normalized output. -/
 theorem replaySample_efficient_of_decoder
@@ -89,6 +89,6 @@ theorem replaySample_efficient_of_decoder
   have bits := (optionIsSome hm).ite' (outputBits_efficient.comp (hv.prod hout)) (.const [])
   apply (normalizeWord_efficient.comp (par.fst'.prod bits)).of_enc_eq
   rintro ⟨code,n,coins⟩
-  cases h : decodeRawFairMachine code <;> simp [replaySample, h, mach, value, Function.comp_def]
+  cases h : decodeRawFairMachine code <;> simp [replaySample, h, mach, value]
 
 end AverageCaseComplexity.Completeness.TwoQuery

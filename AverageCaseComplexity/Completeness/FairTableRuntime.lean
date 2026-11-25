@@ -2,6 +2,8 @@ module
 
 public import AverageCaseComplexity.Completeness.BoundedMachine
 public import Complexity.Computability.Machines.Turing.MultiTape.Universal.Machine
+public import AverageCaseComplexity.Completeness.UniversalStepRuntime
+import all Complexity.Computability.Machines.Turing.MultiTape.Universal.Bound
 
 @[expose] public section
 
@@ -283,6 +285,164 @@ theorem runStructuredTables_encodedOutput_bound
   change (encList encUnary (runStructuredTables p)).length ≤ coins.length * (2 * D + 1)
   exact henc.trans (Nat.mul_le_mul_right _ hlen')
 
+/-- The input encoding used by the runtime certificate: two unrestricted descriptions, a unary
+symbol list, and an explicit coin tape. -/
+def eStructuredTables : Desc × (Desc × (List ℕ × Word)) ↪ Word :=
+  encPair eDesc (encPair eDesc (encPair (encList encUnary) encBits))
+
+/-- A structured replay is computable in polynomial time from the two descriptions, unary
+input, and explicit coin tape. The accumulator bound follows from `fold_inv`, which also bounds
+every intermediate universal configuration through `Universal.length_eCfg_le`. -/
+theorem runStructuredTables_efficient :
+    ComputableTidilyInPolyTime runStructuredTables eStructuredTables (encList encUnary) := by
+  let par := fun p : Desc × (Desc × (List ℕ × Word)) =>
+    (p.1, (p.2.1, p.2.2.1))
+  let coins := fun p : Desc × (Desc × (List ℕ × Word)) => p.2.2.2
+  let initial := fun p : Desc × (Desc × (List ℕ × Word)) => (init p.1, ([] : List ℕ))
+  let step (q : Desc × (Desc × List ℕ)) (s : SCfg × List ℕ) (b : Bool) :
+      SCfg × List ℕ :=
+    stepOut (if b then q.2.1 else q.1) q.2.2 s
+  have hpar : ComputableTidilyInPolyTime par eStructuredTables
+      (encPair eDesc (encPair eDesc (encList encUnary))) := by
+    dsimp [par, eStructuredTables]
+    fun_prop
+  have hcoins : ComputableTidilyInPolyTime coins eStructuredTables encBits := by
+    dsimp [coins, eStructuredTables]
+    fun_prop
+  have hinitial : ComputableTidilyInPolyTime initial eStructuredTables
+      (encPair eCfg (encList encUnary)) := by
+    have hi := init_inO.computableTidilyInPolyTime
+      (⟨1, 2, fun _ => by simp⟩ : PolyBounded (fun d : Desc => (eDesc d).length)
+        (fun d => ((eDesc d).length + 1) ^ 2))
+      (⟨1, 1, fun _ => by simp⟩ : PolyBounded (fun d : Desc => (eDesc d).length)
+        (fun d => (eDesc d).length + 1))
+    have hd : ComputableTidilyInPolyTime (fun p : Desc × (Desc × (List ℕ × Word)) => p.1)
+        eStructuredTables eDesc := by fun_prop
+    have hc := hi.comp hd
+    have ho := ComputableTidilyInPolyTime.const
+      (encIn := eStructuredTables) (encMid := encList encUnary) ([] : List ℕ)
+    exact hc.prod ho
+  have hstep : ComputableTidilyInPolyTime
+      (fun z : ((Desc × (Desc × List ℕ)) × (SCfg × List ℕ)) × Bool =>
+        step z.1.1 z.1.2 z.2)
+      (encPair (encPair (encPair eDesc (encPair eDesc (encList encUnary)))
+        (encPair eCfg (encList encUnary))) encBool)
+      (encPair eCfg (encList encUnary)) := by
+    let context := fun z : ((Desc × (Desc × List ℕ)) × (SCfg × List ℕ)) × Bool =>
+      (((if z.2 then z.1.1.2.1 else z.1.1.1), z.1.1.2.2), z.1.2.1)
+    have hcontext : ComputableTidilyInPolyTime context
+        (encPair (encPair (encPair eDesc (encPair eDesc (encList encUnary)))
+          (encPair eCfg (encList encUnary))) encBool) eCtx := by
+      dsimp [context]
+      fun_prop
+    have hraw := universalStep_efficient.comp hcontext
+    have hkeep : ComputableTidilyInPolyTime
+        (fun z : ((Desc × (Desc × List ℕ)) × (SCfg × List ℕ)) × Bool => z.1.2)
+        (encPair (encPair (encPair eDesc (encPair eDesc (encList encUnary)))
+          (encPair eCfg (encList encUnary))) encBool)
+        (encPair eCfg (encList encUnary)) := by
+      fun_prop
+    have htolist : ComputableTidilyInPolyTime (Option.toList : Option ℕ → List ℕ)
+        eSym (encList encUnary) := by
+      have hid := ComputableTidilyInPolyTime.id' (encIn := eSym)
+      have hsome := ComputableTidilyInPolyTime.optionIsSome hid
+      have hvalue : ComputableTidilyInPolyTime (fun o : Option ℕ => o.getD 0)
+          eSym encUnary := by
+        exact ComputableTidilyInPolyTime.optionGetDWithInput hid
+          (ComputableTidilyInPolyTime.const (encIn := eSym) (encMid := encUnary) 0)
+      have hsing : ComputableTidilyInPolyTime (fun n : ℕ => [n]) encUnary
+          (encList encUnary) := by fun_prop
+      have hnil := ComputableTidilyInPolyTime.const (encIn := eSym)
+        (encMid := encList encUnary) ([] : List ℕ)
+      have h := hsome.cond (hsing.comp hvalue) hnil
+      exact h.of_enc_eq (fun o => by cases o <;> rfl)
+    let source := encPair (encPair eCfg eSym) (encPair eCfg (encList encUnary))
+    have hcfg : ComputableTidilyInPolyTime
+        (fun z : (SCfg × Option ℕ) × (SCfg × List ℕ) => z.1.1)
+        source eCfg := by fun_prop
+    have hleft : ComputableTidilyInPolyTime
+        (fun z : (SCfg × Option ℕ) × (SCfg × List ℕ) => z.2.2)
+        source (encList encUnary) := by fun_prop
+    have hopt : ComputableTidilyInPolyTime
+        (fun z : (SCfg × Option ℕ) × (SCfg × List ℕ) => z.1.2)
+        source eSym := by fun_prop
+    have happend := ComputableTidilyInPolyTime.listAppend' hleft (htolist.comp hopt)
+    have hfinish := hcfg.prod happend
+    have hboth := hraw.prod hkeep
+    have h := hfinish.comp hboth
+    exact h.of_enc_eq (fun z => by
+      simp [step, stepOut, context, Universal.step_eq_stepWith])
+  let B := fun p : Desc × (Desc × (List ℕ × Word)) =>
+    100 * ((eStructuredTables p).length + 1) ^ 4
+  have hB : PolyBounded (fun p => (eStructuredTables p).length) B := by
+    exact ⟨100, 4, fun _ => le_rfl⟩
+  have hstates : ∀ p, ∀ i ≤ (coins p).length,
+      (encPair eCfg (encList encUnary)
+        (((coins p).take i).foldl (step (par p)) (initial p))).length ≤ B p := by
+    intro p i hi
+    let df := p.1
+    let dt := p.2.1
+    let input := p.2.2.1
+    let bs := p.2.2.2
+    let n := (eStructuredTables p).length
+    let D := max (descLen df) (descLen dt)
+    have hdf : descLen df ≤ n := by
+      change (eDesc df).length ≤ n
+      exact length_le_encPair_left eDesc _ p
+    have hdt : descLen dt ≤ n := by
+      change (eDesc dt).length ≤ n
+      exact (length_le_encPair_left eDesc _ p.2).trans
+        (length_le_encPair_right eDesc _ p)
+    have hin : (encList encUnary input).length ≤ n := by
+      exact (length_le_encPair_left (encList encUnary) encBits p.2.2).trans
+        ((length_le_encPair_right eDesc _ p.2).trans
+          (length_le_encPair_right eDesc _ p))
+    have hX : input.length ≤ n :=
+      (length_le_length_encList encUnary input).trans hin
+    have hcoinEnc : (encBits bs).length ≤ n := by
+      exact (length_le_encPair_right (encList encUnary) encBits p.2.2).trans
+        ((length_le_encPair_right eDesc _ p.2).trans
+          (length_le_encPair_right eDesc _ p))
+    have hclock : bs.length ≤ n := by
+      simpa [encBits] using hcoinEnc
+    have hinv := fold_inv df dt input bs D
+      (Nat.le_max_left _ _) (Nat.le_max_right _ _) i hi
+    have hcfg := length_eCfg_le hinv.1
+    have hout := length_encList_le encUnary
+      (((bs.take i).foldl (fun c b => stepOut (if b then dt else df) input c)
+        (init df, [])).2) (b := D) (by
+          intro x hx
+          have hx' := hinv.2.2 x hx
+          simpa [encUnary_apply, List.length_replicate] using hx')
+    have hD : D ≤ n := max_le hdf hdt
+    have hiN : i ≤ n := hi.trans hclock
+    have hcfg' : cfgBound D input.length i ≤ cfgBound n n n := by
+      unfold cfgBound tapeBound
+      gcongr
+    have hsize : 2 * cfgBound n n n + 1 + n * (2 * n + 1) ≤
+        100 * (n + 1) ^ 4 := by
+      unfold cfgBound tapeBound
+      nlinarith
+    have houtlen := hinv.2.1
+    calc
+      (encPair eCfg (encList encUnary)
+        (((bs.take i).foldl (fun c b => stepOut (if b then dt else df) input c)
+          (init df, [])))).length
+          ≤ 2 * cfgBound D input.length i + 1 + i * (2 * D + 1) := by
+            simp only [length_encPair]
+            have hout' := hout
+            have hlen' := houtlen
+            nlinarith
+      _ ≤ 2 * cfgBound n n n + 1 + n * (2 * n + 1) := by
+            gcongr
+      _ ≤ 100 * (n + 1) ^ 4 := hsize
+      _ = B p := by simp [B, n]
+  have hfold := ComputableTidilyInPolyTime.foldlWith
+    (par := par) (list := coins) (init := initial) (step := step)
+    hpar hcoins hinitial hstep hB hstates
+  have hresult := (ComputableTidilyInPolyTime.snd eCfg (encList encUnary)).comp hfold
+  exact hresult.of_enc_eq (fun p => by simp [runStructuredTables, par, coins, initial, step])
+
 /-- The raw-machine wrapper is definitionally just the structured replay certified above. -/
 theorem runTables_structured (m : RawFairMachine) (input : List ℕ) (coins : Word) :
     runTables m input coins =
@@ -312,10 +472,5 @@ theorem runTables_output_bound (m : RawFairMachine) (input : List ℕ) (coins : 
           (init ⟨m.tapes, m.initial, m.falseTable⟩, [])).2 := by
       simpa [runStructuredTables] using ho
     exact hout o ho'
-
-/-- The input encoding used by the runtime certificate: two unrestricted descriptions, a unary
-symbol list, and an explicit coin tape. -/
-def eStructuredTables : Desc × (Desc × (List ℕ × Word)) ↪ Word :=
-  encPair eDesc (encPair eDesc (encPair (encList encUnary) encBits))
 
 end AverageCaseComplexity.Completeness.TwoQuery
