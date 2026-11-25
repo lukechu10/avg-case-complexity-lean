@@ -40,8 +40,8 @@ Section 3's [two-query completeness development](docs/two-query-completeness.md)
 (`AverageCaseComplexity/Completeness/TwoQuery.lean`) now has a checked binary
 codec, bounded universal execution, compact source compilation, sampler mass
 bounds, target correctness/usefulness, and a finite-control two-query reduction.
-The `complete` theorem is **not yet certified**: the strict polynomial-time
-proofs for the sampler and target solver remain.
+The `complete` theorem proves completeness for `WithPSamp AvgBPP` under
+errorless reductions. `Tests/TwoQueryExecution.lean` checks its transitive axioms.
 
 Additional checks:
 

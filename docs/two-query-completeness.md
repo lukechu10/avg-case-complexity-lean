@@ -1,9 +1,6 @@
-# Two-query completeness: implementation in progress
+# Two-query completeness
 
-`AverageCaseComplexity/Completeness/TwoQuery.lean` develops Itsykson §3,
-Theorems 3.1–3.2 and their prerequisites. **Completeness is not yet proved:**
-the sampler and target solver still require strict polynomial-time certificates. The final assembly has a proof body, but its dependencies
-still include `sorryAx`; successful elaboration is not a completeness certificate.
+`AverageCaseComplexity.Completeness.TwoQuery.complete` formalizes Itsykson §3, Theorems 3.1–3.2. The constructed problem belongs to `WithPSamp AvgBPP`, and every member of that class has an errorless reduction to it using two nonadaptive queries.
 
 ## Proof map
 
@@ -12,7 +9,7 @@ still include `sorryAx`; successful elaboration is not a completeness certificat
 - **Target solver (Lemma 3.1):** `targetProgram` rejects invalid inputs, enumerates all coin tapes if the unary accuracy can pay for them, and otherwise uses the 80% majority scheme. `targetProgram_correct` and `targetProgram_useful` are unconditional. `ExactVoteRuntime` certifies guarded doubling enumeration, proves each tape occurs exactly once, and charges intermediate lists to the input size. `VoteRuntime` supplies certified repetition and voting.
 - **Source compilation:** `SourceClock` turns a PPT cutoff into a genuine halting bound so padding cannot change the distribution. `FairTables` proves replay of both transition tables agrees with every source coin tape. `TableCompiler` serializes those tables and proves the raw compiler correct; `SourceReplay` handles compact specialization and normalization. Both `compile_algorithm` and `compile_sampler` are proved without placeholders.
 - **Two-query reduction:** `CompiledSource.reduction` packages the finite-control machine for two certified query constructors. Its trace is exactly the two prescribed queries for every oracle; its answer is their agreement or give-up. The correctness, usefulness and domination proofs use the source law and the sampler mass bounds.
-- **Runtime:** `TupleDecodingRuntime` certifies seed and instance decoding on arbitrary words. `RawDecoderRuntime` certifies unary field scanning. `UniversalStepRuntime` certifies a single step even on an unreachable configuration by bounding the input index before converting it to unary. Full runtime certification is the remaining obligation for target membership and samplability.
+- **Runtime:** `TupleDecodingRuntime` certifies seed and instance decoding on arbitrary words. `RawDecoderRuntime` certifies unary field scanning. `UniversalStepRuntime` certifies a single step even on an unreachable configuration by bounding the input index before converting it to unary. `RawRowRuntime` and `RawMachineRuntime` certify checked table parsing, `FairTableRuntime` bounds the whole coin-driven simulation, and `BoundedReplayRuntime` supplies the replay certificates used by `sampler_efficient` and `targetProgram_efficient`.
 
 `Tests/TwoQueryExecution.lean` guards the completed execution and compilation milestones against additional axioms; `Tests/BoundedReplay.lean` exercises them on an actual two-state machine with distinct nonstandard symbol codes.
 
@@ -38,7 +35,7 @@ still include `sorryAx`; successful elaboration is not a completeness certificat
 
 ## Support qualification
 
-The skeleton includes `queries_supported_outside_exceptional`, not an
+The proof establishes `queries_supported_outside_exceptional`, not an
 unconditional `QueriesSupported` theorem. Lemma 3.2's lower bound applies to
 reliable source computations outside the exceptional set. A computation that
 always gives up need not pass the sampler's reliability filter at all.
@@ -52,18 +49,9 @@ modify the construction and prove the stronger property.
 ## Validation
 
 ```sh
-lake build AverageCaseComplexity.Completeness.VoteRuntime \
-  AverageCaseComplexity.Completeness.TupleEncoding \
-  AverageCaseComplexity.Completeness.CompactCode \
-  AverageCaseComplexity.Completeness.LengthNormalization \
-  AverageCaseComplexity.Completeness.SeedMass
-lake env lean Tests/TwoQueryAnswerLaw.lean
-lake env lean Tests/TwoQueryEncoding.lean
-lake env lean Tests/TwoQueryFoundations.lean
-lake env lean AverageCaseComplexity/Completeness/TwoQuery.lean
+lake build
+lake env lean Tests/TwoQueryExecution.lean
+lake env lean Tests/BoundedReplay.lean
 ```
 
-The foundational tests must pass without placeholders or added postulates.
-CI runs every `Tests/*.lean` file after the library build, including the axiom
-whitelist. The final command still emits `sorry` warnings: final theorem
-elaboration is not yet a proof of completeness.
+CI runs every `Tests/*.lean` file. `TwoQueryExecution.lean` checks the transitive axioms of `complete` against the whitelist `propext`, `Classical.choice`, and `Quot.sound`.

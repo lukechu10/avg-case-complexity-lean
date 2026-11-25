@@ -20,14 +20,12 @@ public import Mathlib.Analysis.SpecialFunctions.Exp
 @[expose] public section
 
 /-!
-# Itsykson's two-query complete problem (§3, Theorems 3.1–3.2), in progress
+# Itsykson's two-query complete problem (§3, Theorems 3.1–3.2)
 
-This is NOT a completed formalization. Foundational theorems and executable
-constructions still have explicit `sorry` bodies. Conditional reduction proofs
-and final assembly do not remove those dependencies. In particular, the
-universal interpreter and its compilers must ultimately use the library's
-finite-control fair-coin machines, not arbitrary PMFs supplied with an asserted
-running time. The separate `AnswerLaw` module has no placeholders.
+`complete` proves membership in samplable AvgBPP and an errorless reduction
+from every problem in that class. The reduction makes two nonadaptive queries.
+The universal interpreter and both source compilers use the library's
+finite-control fair-coin machines.
 
 Dependency order:
 1. binary machine codes and logarithmic-overhead tuple encoding;
@@ -140,7 +138,7 @@ def sampler (n : ℕ) : Cslib.ProbComp Word := do
           z.fallback, z.samplerCode, z.samplerClockBits.length⟩
         else List.replicate n true
 
-/-- The semantic step-by-step specification must be proved for the implementation. -/
+/-- Step-by-step specification of the executable sampler; see `sampler_eval`. -/
 noncomputable def samplerLaw (n : ℕ) : PMF Word :=
   (uniformEnsemble.wordDistribution n).bind fun w =>
     match decodeSeed w with
@@ -631,8 +629,8 @@ theorem targetProgram_efficient :
     Cslib.Probability.IsPPTOn schemeInputEncoding answerEncoding targetProgram :=
   targetProgram_efficient_of_replay replayAnswer_efficient
 
-/-- Arithmetic bound on the exact branch's enumeration count. The full
-machine-level cost of enumeration and simulation remains to be certified. -/
+/-- Arithmetic bound on the enumeration count. `targetProgram_efficient` also
+accounts for the machine-level cost of replay and counting. -/
 theorem exact_branch_budget (m : ℕ) (k : Accuracy) (h : 2 ^ m ≤ k.val) :
     2 ^ m ≤ k.val + 1 := by
   omega

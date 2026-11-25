@@ -68,8 +68,7 @@ example (A : PolyTimeRandomizedScheme)
   majorityProgram_efficient A.efficient hc
 
 -- This test fails if any completed foundational milestone acquires sorryAx
--- or a new postulate. The unfinished final completeness theorem is deliberately
--- not included: its dependencies have not yet all been implemented.
+-- or a new postulate. `Tests/TwoQueryExecution.lean` checks the final theorem.
 run_cmd do
   let allowed := #[``propext, ``Classical.choice, ``Quot.sound]
   for decl in #[``decodeSeed_encodeSeed, ``decodeSeed_encodeSeed_eq, ``decode_sound,

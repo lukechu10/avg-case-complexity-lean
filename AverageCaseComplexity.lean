@@ -11,6 +11,6 @@ import AverageCaseComplexity.Amplification.ThresholdCaveat
 import AverageCaseComplexity.Reductions
 import AverageCaseComplexity.Reductions.TwoQueryMachine
 import AverageCaseComplexity.Reductions.StateReindex
--- In-progress §3 development: final completeness still depends on `sorry` prerequisites.
+-- Itsykson §3: membership and errorless two-query completeness.
 import AverageCaseComplexity.Completeness.TwoQuery
 import AverageCaseComplexity.Completeness.SourceClock
